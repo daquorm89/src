@@ -29,6 +29,7 @@ namespace SharedStringIds
 	MAKE_STRING_ID(cmd_err,       unstick_request_complete);
 	MAKE_STRING_ID(cmd_err,       unstick_request_cancelled);
 	MAKE_STRING_ID(shared,        revoke_dependant_skill);
+	MAKE_STRING_ID(shared,        not_enough_skill_points);
 	MAKE_STRING_ID(shared,        no_waypoint_datapad_full);
 
 //	MAKE_STRING_ID(shared,        player_sit_on_chair_prose);

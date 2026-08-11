@@ -6285,6 +6285,31 @@ static void commandFuncRevokeSkill(Command const &, NetworkId const &actor, Netw
 
 // ----------------------------------------------------------------------
 
+static void commandFuncSurrenderSkill(Command const &, NetworkId const &actor, NetworkId const & /*target*/, Unicode::String const &params)
+{
+	CreatureObject * const creature = CreatureObject::getCreatureObject(actor);
+	if (creature == nullptr)
+		return;
+
+	size_t pos = 0;
+	std::string const skillName = nextStringParm(params, pos);
+	if (skillName.empty())
+		return;
+
+	SkillObject const * const skill = SkillManager::getInstance().getSkill(skillName);
+	if (skill == nullptr)
+		return;
+
+	if (!creature->hasSkill(*skill))
+		return;
+
+	LOG("CustomerService", ("Skill: player %s surrendered skill %s via surrenderSkill.",
+		creature->getNetworkId().getValueString().c_str(), skillName.c_str()));
+	creature->revokeSkill(*skill);
+}
+
+// ----------------------------------------------------------------------
+
 static void commandFuncSetCurrentSkillTitle(Command const &, NetworkId const &actor, NetworkId const & target, Unicode::String const &params)
 {
 	CreatureObject * const creatureObject = CreatureObject::getCreatureObject(actor);
@@ -9867,6 +9892,7 @@ void CommandCppFuncs::install()
 
 	//skill
 	CommandTable::addCppFunction("revokeSkill", commandFuncRevokeSkill);
+	CommandTable::addCppFunction("surrenderSkill", commandFuncSurrenderSkill);
 	CommandTable::addCppFunction("setCurrentSkillTitle", commandFuncSetCurrentSkillTitle);
 
 	//misc ui

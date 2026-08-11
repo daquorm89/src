@@ -708,9 +708,10 @@ void CreatureObject::makePetMountable()
 
 	//-- Set the Condition bit to indicate we're a mount.
 	setCondition(getCondition() | static_cast<int>(ServerTangibleObjectTemplate::C_mount));
-
-	//-- Set the Creature as static so that it doesn't count against the spawn limit.
-	setIsStatic(true);
+	//-- NOTE: previously called setIsStatic(true) here, which made trained mounts
+	//-- inert (no hibernation exemption, no alter ticks) even while actively being
+	//-- used as a regular follow/stay pet. Mounts should behave like any other pet
+	//-- and only differ by also being rideable, so this is intentionally no longer set.
 }
 
 // ----------------------------------------------------------------------

@@ -517,7 +517,7 @@ float AICreatureController::realAlter(float time)
 //		DEBUG_REPORT_LOG(true, ("[aitest] Hibernating %s from alter\n", creatureOwner->getNetworkId().getValueString().c_str()));
 		return alterResult;
 	}
-	
+
 	// check floating
 	{
 		CollisionProperty const * const collision = creatureOwner->getCollisionProperty();
@@ -1617,6 +1617,15 @@ bool AICreatureController::shouldHibernate ( void ) const
 	{
 		return false;
 	}
+
+	// Never hibernate while actively being ridden -- follow's movement type
+	// suppresses hibernation via getHibernateOk(), but stay/idle movement
+	// does not, which otherwise lets a mounted creature hibernate under
+	// its rider. A mount must stay ticking for the whole ride regardless
+	// of its current movement state.
+	CreatureObject const * const creature = getCreature();
+	if (creature != nullptr && creature->getState(States::MountedCreature))
+		return false;
 
 	return CreatureController::shouldHibernate();
 }

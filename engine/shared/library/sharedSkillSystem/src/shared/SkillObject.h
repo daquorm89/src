@@ -31,6 +31,7 @@ public:
 
 	const SkillObject *                         findCategory                    () const;
 
+	const int                                   getSkillPointsRequired          () const;
 	const StringVector &                        getCommandsProvided             () const;
 	const StringVector &                        getSchematicsGranted            () const;
 	const SkillVector &                         getNextSkillBoxes               () const;
@@ -64,6 +65,7 @@ public:
 		ExperienceVector                            prerequisiteExperience;
 		SpeciesFlagVector                           prerequisiteSpecies;
 		GenericModVector                            prerequisiteFactionStanding;
+		int                                          skillPointsRequired;   // POINTS_REQUIRED column -- pre-CU skillpoint cost to acquire this skill box
 
 		// descriptors
 		std::string                                 skillName;
@@ -93,6 +95,7 @@ private:
 	static const std::string ms_prerequisiteExperienceAmountLabel;
 	static const std::string ms_prerequisiteExperienceLimitLabel;
 	static const std::string ms_prerequisiteSpeciesLabel;
+	static const std::string ms_skillPointsRequiredLabel;
 	static const std::string ms_commandsLabel;
 	static const std::string ms_statisticsModifiersLabel;
 	static const std::string ms_parentLabel;

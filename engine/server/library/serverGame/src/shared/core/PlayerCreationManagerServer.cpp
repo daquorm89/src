@@ -44,6 +44,10 @@ void PlayerCreationManagerServer::remove ()
 
 bool PlayerCreationManagerServer::setupPlayer(CreatureObject & obj, const std::string & profession, StationId account, bool isJedi)
 {
+	// TEMPORARY DEBUG -- remove once skill-point-at-creation bug is found
+	printf("DEBUG setupPlayer CALLED: profession='%s' objectId=%s\n", profession.c_str(), obj.getNetworkId().getValueString().c_str());
+	fflush(stdout);
+
 	// NOTE: the isJedi flag doesn't actually create a Jedi character, but we need it
 	// so that the database/login server will keep track of a player's extra character
 	// slots correctly
@@ -65,6 +69,13 @@ bool PlayerCreationManagerServer::setupPlayer(CreatureObject & obj, const std::s
 		WARNING (true, ("PlayerCreationManagerServer error loading for %s, %s", sharedObjectTemplateName.c_str (), profession.c_str ()));
 		return false;
 	}
+
+	//----------------------------------------------------------------------
+	//-- pre-CU skillpoint pool -- must be set before any grantSkill() call,
+	//-- including the newbie-tutorial-deferred novice grant (newbie_skipped.java)
+	//-- and the TESTCENTER bounty-hunter block further down in this function.
+	static int const cs_startingSkillPoints = 250; // TODO: make server-configurable later
+	obj.setAvailableSkillPoints (cs_startingSkillPoints);
 
 	//----------------------------------------------------------------------
 	//-- setup skills

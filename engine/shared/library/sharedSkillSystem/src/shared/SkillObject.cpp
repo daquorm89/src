@@ -20,6 +20,7 @@ const std::string SkillObject::ms_prerequisiteExperienceTypeLabel   = "XP_TYPE";
 const std::string SkillObject::ms_prerequisiteExperienceAmountLabel = "XP_COST";
 const std::string SkillObject::ms_prerequisiteExperienceLimitLabel  = "XP_CAP";
 const std::string SkillObject::ms_prerequisiteSpeciesLabel          = "SPECIES_REQUIRED";
+const std::string SkillObject::ms_skillPointsRequiredLabel          = "POINTS_REQUIRED";
 const std::string SkillObject::ms_commandsLabel                     = "COMMANDS";
 const std::string SkillObject::ms_statisticsModifiersLabel          = "SKILL_MODS";
 const std::string SkillObject::ms_parentLabel                       = "PARENT";
@@ -67,6 +68,7 @@ prerequisiteSkills             (),
 prerequisiteExperience         (),
 prerequisiteSpecies            (),
 prerequisiteFactionStanding    (),
+skillPointsRequired            (0),
 skillName                      ("UNINITIALIZED SKILL"),
 nextSkillBoxes                 (),
 prevSkill                      (0),
@@ -86,6 +88,7 @@ prerequisiteSkills            (source.prerequisiteSkills),
 prerequisiteExperience        (source.prerequisiteExperience),
 prerequisiteSpecies           (source.prerequisiteSpecies),
 prerequisiteFactionStanding   (source.prerequisiteFactionStanding),
+skillPointsRequired           (source.skillPointsRequired),
 skillName                     (source.skillName),
 nextSkillBoxes                (source.nextSkillBoxes),
 prevSkill                     (0),
@@ -114,6 +117,7 @@ SkillObject::SkillData & SkillObject::SkillData::operator = (const SkillData & r
 		prerequisiteExperience =         rhs.prerequisiteExperience;
 		prerequisiteSpecies =            rhs.prerequisiteSpecies;
 		prerequisiteFactionStanding =    rhs.prerequisiteFactionStanding;
+		skillPointsRequired =            rhs.skillPointsRequired;
 		skillName =                      rhs.skillName;
 		nextSkillBoxes =                 rhs.nextSkillBoxes;
 		commandsProvided =               rhs.commandsProvided;
@@ -165,6 +169,13 @@ const SkillObject::SkillData & SkillObject::getSkillData() const
 const SkillObject::ExperienceVector & SkillObject::getPrerequisiteExperienceVector () const
 {
 	return skillData.prerequisiteExperience;
+}
+
+//-----------------------------------------------------------------
+
+const int SkillObject::getSkillPointsRequired () const
+{
+	return skillData.skillPointsRequired;
 }
 
 //-----------------------------------------------------------------
@@ -489,6 +500,7 @@ bool SkillObject::load(DataTable & dataTable, const std::string & skillName)
 	skillData.isTitle                 = dataTable.getIntValue(SkillObject::ms_isTitleLabel, skillRow) != 0;
 	skillData.isProfession            = dataTable.getIntValue(SkillObject::ms_isProfessionLabel, skillRow) != 0;
 	skillData.isSearchable            = dataTable.getIntValue(SkillObject::ms_isSearchableLabel, skillRow) != 0;
+	skillData.skillPointsRequired     = dataTable.getIntValue(SkillObject::ms_skillPointsRequiredLabel, skillRow);
 
 	return true;
 }

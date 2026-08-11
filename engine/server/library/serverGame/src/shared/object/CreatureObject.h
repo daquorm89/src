@@ -292,6 +292,8 @@ public:
 	int                 getExperiencePoints(const std::string & experienceType) const;
 	const std::map<std::string, int> &  getExperiencePoints() const;
 	const SkillList &   getSkillList() const;
+	const int           getAvailableSkillPoints() const;
+	void                setAvailableSkillPoints(int points);
 	const std::map<std::string, std::pair<int, int> > & getModMap() const;
 	const int           getModValue(const std::string & modName) const;
 	const int           getEnhancedModValue(const std::string & modName) const;	
@@ -912,6 +914,7 @@ private:
 	Archive::AutoDeltaMap<std::string, std::pair<int, int> >   m_modMap;        // sync calculated mod information with client and server (pistol_accuracy, for example)
 
 	Archive::AutoDeltaSet<const SkillObject *>    m_skills;
+	Archive::AutoDeltaVariable<int>               m_availableSkillPoints;   // pre-CU skillpoint pool (starts at 250, see PlayerCreationManagerServer)
 
 	// Mission system related data
 	ServerObject *                                   m_missionTerminal;

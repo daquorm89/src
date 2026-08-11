@@ -57,6 +57,12 @@ AiMovementFollow::AiMovementFollow( AICreatureController * controller, ServerObj
 
 		triggerWaiting();
 	}
+	else
+	{
+		addPathNode(m_target);
+
+		triggerMoving();
+	}
 }
 
 // ----------
@@ -77,6 +83,12 @@ AiMovementFollow::AiMovementFollow( AICreatureController * controller, ServerObj
 		CHANGE_STATE( AiMovementFollow::stateWaiting  );
 
 		triggerWaiting();
+	}
+	else
+	{
+		addPathNode(m_offsetTarget);
+
+		triggerMoving();
 	}
 }
 

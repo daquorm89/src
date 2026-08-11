@@ -2345,7 +2345,7 @@ as
 		null;
 	end;
 
-	procedure save_creature_obj( p_object_id VAOFSTRING, p_scale_factor VAOFNUMBER, p_states VAOFNUMBER, p_posture VAOFNUMBER, p_shock_wounds VAOFNUMBER, p_master_id VAOFSTRING, p_rank VAOFNUMBER, p_base_walk_speed VAOFNUMBER, p_base_run_speed VAOFNUMBER, p_attribute_0 VAOFNUMBER, p_attribute_1 VAOFNUMBER, p_attribute_2 VAOFNUMBER, p_attribute_3 VAOFNUMBER, p_attribute_4 VAOFNUMBER, p_attribute_5 VAOFNUMBER, p_attribute_6 VAOFNUMBER, p_attribute_7 VAOFNUMBER, p_attribute_8 VAOFNUMBER, p_attribute_9 VAOFNUMBER, p_attribute_10 VAOFNUMBER, p_attribute_11 VAOFNUMBER, p_attribute_12 VAOFNUMBER, p_attribute_13 VAOFNUMBER, p_attribute_14 VAOFNUMBER, p_attribute_15 VAOFNUMBER, p_attribute_16 VAOFNUMBER, p_attribute_17 VAOFNUMBER, p_attribute_18 VAOFNUMBER, p_attribute_19 VAOFNUMBER, p_attribute_20 VAOFNUMBER, p_attribute_21 VAOFNUMBER, p_attribute_22 VAOFNUMBER, p_attribute_23 VAOFNUMBER, p_attribute_24 VAOFNUMBER, p_attribute_25 VAOFNUMBER, p_attribute_26 VAOFNUMBER, p_persisted_buffs VAOFSTRING, p_ws_x VAOFNUMBER, p_ws_y VAOFNUMBER, p_ws_z VAOFNUMBER, p_chunk_size number )
+	procedure save_creature_obj( p_object_id VAOFSTRING, p_scale_factor VAOFNUMBER, p_states VAOFNUMBER, p_posture VAOFNUMBER, p_shock_wounds VAOFNUMBER, p_master_id VAOFSTRING, p_rank VAOFNUMBER, p_base_walk_speed VAOFNUMBER, p_base_run_speed VAOFNUMBER, p_attribute_0 VAOFNUMBER, p_attribute_1 VAOFNUMBER, p_attribute_2 VAOFNUMBER, p_attribute_3 VAOFNUMBER, p_attribute_4 VAOFNUMBER, p_attribute_5 VAOFNUMBER, p_attribute_6 VAOFNUMBER, p_attribute_7 VAOFNUMBER, p_attribute_8 VAOFNUMBER, p_attribute_9 VAOFNUMBER, p_attribute_10 VAOFNUMBER, p_attribute_11 VAOFNUMBER, p_attribute_12 VAOFNUMBER, p_attribute_13 VAOFNUMBER, p_attribute_14 VAOFNUMBER, p_attribute_15 VAOFNUMBER, p_attribute_16 VAOFNUMBER, p_attribute_17 VAOFNUMBER, p_attribute_18 VAOFNUMBER, p_attribute_19 VAOFNUMBER, p_attribute_20 VAOFNUMBER, p_attribute_21 VAOFNUMBER, p_attribute_22 VAOFNUMBER, p_attribute_23 VAOFNUMBER, p_attribute_24 VAOFNUMBER, p_attribute_25 VAOFNUMBER, p_attribute_26 VAOFNUMBER, p_persisted_buffs VAOFSTRING, p_ws_x VAOFNUMBER, p_ws_y VAOFNUMBER, p_ws_z VAOFNUMBER, p_available_skill_points VAOFNUMBER, p_chunk_size number )
 	as
 
 	m_enable_db_logging INTEGER := 0;
@@ -2391,7 +2391,8 @@ as
 			creature_objects.persisted_buffs = nvl(p_persisted_buffs(i),creature_objects.persisted_buffs),
 			creature_objects.ws_x = nvl(p_ws_x(i),creature_objects.ws_x),
 			creature_objects.ws_y = nvl(p_ws_y(i),creature_objects.ws_y),
-			creature_objects.ws_z = nvl(p_ws_z(i),creature_objects.ws_z)
+			creature_objects.ws_z = nvl(p_ws_z(i),creature_objects.ws_z),
+			creature_objects.available_skill_points = nvl(p_available_skill_points(i),creature_objects.available_skill_points)
 		where
 			creature_objects.object_id=p_object_id(i);
 	exception
@@ -2438,7 +2439,8 @@ as
 					creature_objects.persisted_buffs = nvl(p_persisted_buffs(i),creature_objects.persisted_buffs),
 					creature_objects.ws_x = nvl(p_ws_x(i),creature_objects.ws_x),
 					creature_objects.ws_y = nvl(p_ws_y(i),creature_objects.ws_y),
-					creature_objects.ws_z = nvl(p_ws_z(i),creature_objects.ws_z)
+					creature_objects.ws_z = nvl(p_ws_z(i),creature_objects.ws_z),
+					creature_objects.available_skill_points = nvl(p_available_skill_points(i),creature_objects.available_skill_points)
 					where
 					creature_objects.object_id=p_object_id(i);
 				end LOOP;
@@ -2490,6 +2492,7 @@ as
 								db_error_logger.dblogerror_values('persister.save_creature_obj','ws_x','float',to_char(p_ws_x(m_error_index)));
 								db_error_logger.dblogerror_values('persister.save_creature_obj','ws_y','float',to_char(p_ws_y(m_error_index)));
 								db_error_logger.dblogerror_values('persister.save_creature_obj','ws_z','float',to_char(p_ws_z(m_error_index)));
+								db_error_logger.dblogerror_values('persister.save_creature_obj','available_skill_points','int',to_char(p_available_skill_points(m_error_index)));
 
 							END IF;
 						END IF;
@@ -2500,7 +2503,7 @@ as
 			end;
 	end;
 
-	procedure add_creature_obj( p_object_id VAOFSTRING, p_scale_factor VAOFNUMBER, p_states VAOFNUMBER, p_posture VAOFNUMBER, p_shock_wounds VAOFNUMBER, p_master_id VAOFSTRING, p_rank VAOFNUMBER, p_base_walk_speed VAOFNUMBER, p_base_run_speed VAOFNUMBER, p_attribute_0 VAOFNUMBER, p_attribute_1 VAOFNUMBER, p_attribute_2 VAOFNUMBER, p_attribute_3 VAOFNUMBER, p_attribute_4 VAOFNUMBER, p_attribute_5 VAOFNUMBER, p_attribute_6 VAOFNUMBER, p_attribute_7 VAOFNUMBER, p_attribute_8 VAOFNUMBER, p_attribute_9 VAOFNUMBER, p_attribute_10 VAOFNUMBER, p_attribute_11 VAOFNUMBER, p_attribute_12 VAOFNUMBER, p_attribute_13 VAOFNUMBER, p_attribute_14 VAOFNUMBER, p_attribute_15 VAOFNUMBER, p_attribute_16 VAOFNUMBER, p_attribute_17 VAOFNUMBER, p_attribute_18 VAOFNUMBER, p_attribute_19 VAOFNUMBER, p_attribute_20 VAOFNUMBER, p_attribute_21 VAOFNUMBER, p_attribute_22 VAOFNUMBER, p_attribute_23 VAOFNUMBER, p_attribute_24 VAOFNUMBER, p_attribute_25 VAOFNUMBER, p_attribute_26 VAOFNUMBER, p_persisted_buffs VAOFSTRING, p_ws_x VAOFNUMBER, p_ws_y VAOFNUMBER, p_ws_z VAOFNUMBER, p_chunk_size number )
+	procedure add_creature_obj( p_object_id VAOFSTRING, p_scale_factor VAOFNUMBER, p_states VAOFNUMBER, p_posture VAOFNUMBER, p_shock_wounds VAOFNUMBER, p_master_id VAOFSTRING, p_rank VAOFNUMBER, p_base_walk_speed VAOFNUMBER, p_base_run_speed VAOFNUMBER, p_attribute_0 VAOFNUMBER, p_attribute_1 VAOFNUMBER, p_attribute_2 VAOFNUMBER, p_attribute_3 VAOFNUMBER, p_attribute_4 VAOFNUMBER, p_attribute_5 VAOFNUMBER, p_attribute_6 VAOFNUMBER, p_attribute_7 VAOFNUMBER, p_attribute_8 VAOFNUMBER, p_attribute_9 VAOFNUMBER, p_attribute_10 VAOFNUMBER, p_attribute_11 VAOFNUMBER, p_attribute_12 VAOFNUMBER, p_attribute_13 VAOFNUMBER, p_attribute_14 VAOFNUMBER, p_attribute_15 VAOFNUMBER, p_attribute_16 VAOFNUMBER, p_attribute_17 VAOFNUMBER, p_attribute_18 VAOFNUMBER, p_attribute_19 VAOFNUMBER, p_attribute_20 VAOFNUMBER, p_attribute_21 VAOFNUMBER, p_attribute_22 VAOFNUMBER, p_attribute_23 VAOFNUMBER, p_attribute_24 VAOFNUMBER, p_attribute_25 VAOFNUMBER, p_attribute_26 VAOFNUMBER, p_persisted_buffs VAOFSTRING, p_ws_x VAOFNUMBER, p_ws_y VAOFNUMBER, p_ws_z VAOFNUMBER, p_available_skill_points VAOFNUMBER, p_chunk_size number )
 	as
 	m_enable_db_logging INTEGER := 0;
 	m_error_index INTEGER :=1;
@@ -2547,7 +2550,8 @@ as
 			creature_objects.object_id,
 			creature_objects.ws_x,
 			creature_objects.ws_y,
-			creature_objects.ws_z
+			creature_objects.ws_z,
+			creature_objects.available_skill_points
 		)
 		VALUES
 		(
@@ -2590,7 +2594,8 @@ as
 			p_object_id(i),
 			NULL,
 			NULL,
-			NULL
+			NULL,
+			p_available_skill_points(i)
 		);
 
 	exception
@@ -2641,7 +2646,8 @@ as
 					creature_objects.persisted_buffs = nvl(p_persisted_buffs(i),creature_objects.persisted_buffs),
 					creature_objects.ws_x = nvl(p_ws_x(i),creature_objects.ws_x),
 					creature_objects.ws_y = nvl(p_ws_y(i),creature_objects.ws_y),
-					creature_objects.ws_z = nvl(p_ws_z(i),creature_objects.ws_z)
+					creature_objects.ws_z = nvl(p_ws_z(i),creature_objects.ws_z),
+					creature_objects.available_skill_points = nvl(p_available_skill_points(i),creature_objects.available_skill_points)
 				where
 					creature_objects.object_id=p_object_id(i);
 
@@ -2687,7 +2693,8 @@ as
 					creature_objects.object_id,
 					creature_objects.ws_x,
 					creature_objects.ws_y,
-					creature_objects.ws_z
+					creature_objects.ws_z,
+					creature_objects.available_skill_points
 					)
 					VALUES
 					(
@@ -2730,7 +2737,8 @@ as
 					p_object_id(i),
 					NULL,
 					NULL,
-					NULL
+					NULL,
+					p_available_skill_points(i)
 					);
 				end if;
 			end loop;
@@ -2780,7 +2788,8 @@ as
 				creature_objects.object_id,
 				creature_objects.ws_x,
 				creature_objects.ws_y,
-				creature_objects.ws_z
+				creature_objects.ws_z,
+				creature_objects.available_skill_points
 			)
 			VALUES
 			(
@@ -2823,7 +2832,8 @@ as
 				p_object_id(i),
 				NULL,
 				NULL,
-				NULL
+				NULL,
+				p_available_skill_points(i)
 			);
 
 			end loop;
@@ -2874,6 +2884,7 @@ as
 						db_error_logger.dblogerror_values('persister.add_creature_obj','ws_x','float',p_ws_x(m_error_index));
 						db_error_logger.dblogerror_values('persister.add_creature_obj','ws_y','float',p_ws_y(m_error_index));
 						db_error_logger.dblogerror_values('persister.add_creature_obj','ws_z','float',p_ws_z(m_error_index));
+						db_error_logger.dblogerror_values('persister.add_creature_obj','available_skill_points','int',p_available_skill_points(m_error_index));
 					END IF;
 				END IF;
 				IF (db_error_logger.reraisecheck('persister','add_creature_obj') = 1) THEN

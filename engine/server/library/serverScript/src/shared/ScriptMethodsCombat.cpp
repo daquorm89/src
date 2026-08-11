@@ -1919,7 +1919,9 @@ jboolean JNICALL ScriptMethodsCombatNamespace::callDefenderCombatAction(JNIEnv *
 	jint * resultsArray = env->GetIntArrayElements(results, nullptr);
 	if (resultsArray == nullptr)
 		return JNI_FALSE;
-
+	ServerObject * attackerObject = (attackerId.getObject() != nullptr)
+		? safe_cast<ServerObject *>(attackerId.getObject())
+		: nullptr;
 	for (jsize i = 0; i < defenderCount; ++i)
 	{
 		jlong defender;
@@ -1940,12 +1942,22 @@ jboolean JNICALL ScriptMethodsCombatNamespace::callDefenderCombatAction(JNIEnv *
 					defenderObject->getScriptObject()->trigAllScripts(
 						Scripting::TRIG_DEFENDER_COMBAT_ACTION, params);
 				}
+				// TAMEDEBUG-era gap: TRIG_ATTACKER_COMBAT_ACTION was declared in the
+				// function table but never fired anywhere. Reconnecting it here,
+				// alongside the defender trigger, using the same attacker/weapon/defender
+				// data already available in this loop.
+				if (attackerObject != nullptr && attackerObject->getScriptObject() != nullptr)
+				{
+					ScriptParams attackerParams;
+					attackerParams.addParam(weaponId);
+					attackerParams.addParam(defenderId);
+					attackerObject->getScriptObject()->trigAllScripts(
+						Scripting::TRIG_ATTACKER_COMBAT_ACTION, attackerParams);
+				}
 			}
 		}
 	}
-
 	env->ReleaseIntArrayElements(results, resultsArray, JNI_ABORT);
-
 	return JNI_TRUE;
 }	// JavaLibrary::callDefenderCombatAction
 

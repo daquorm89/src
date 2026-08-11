@@ -40,6 +40,7 @@ create table creature_objects
 	ws_x float,
 	ws_y float,
 	ws_z float,
+	available_skill_points int,
 	primary key (object_id)
 );
 

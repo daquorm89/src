@@ -10,6 +10,8 @@
 #pragma warning(disable : 4100 4514)
 #include "serverGame/CreatureObject.h"
 
+#include <unistd.h>
+
 #include "SwgGameServer/CombatEngine.h"
 #include "SwgGameServer/ConfigCombatEngine.h"
 #include "UnicodeUtils.h"
@@ -718,6 +720,7 @@ CreatureObject::CreatureObject(const ServerCreatureObjectTemplate* newTemplate) 
 	m_currentWeapon               (),
 	m_modMap                      (),
 	m_skills                      (),
+	m_availableSkillPoints        (0),
 	m_deferComputeTotalAttributes (0),
 	m_group                       (),
 	m_groupInviter                (),
@@ -3608,6 +3611,33 @@ const CreatureObject::SkillList & CreatureObject::getSkillList() const
 
 //-----------------------------------------------------------------------
 
+const int CreatureObject::getAvailableSkillPoints() const
+{
+	return m_availableSkillPoints.get();
+}
+
+//-----------------------------------------------------------------------
+
+void CreatureObject::setAvailableSkillPoints(int points)
+{
+	printf("DEBUG setAvailableSkillPoints called: points=%d objectId=%s authoritative=%d pid=%d\n",
+		points,
+		getNetworkId().getValueString().c_str(),
+		isAuthoritative() ? 1 : 0,
+		static_cast<int>(getpid()));
+	fflush(stdout);
+
+	m_availableSkillPoints = points;
+
+	printf("DEBUG setAvailableSkillPoints AFTER assign: pool=%d objectId=%s pid=%d\n",
+		m_availableSkillPoints.get(),
+		getNetworkId().getValueString().c_str(),
+		static_cast<int>(getpid()));
+	fflush(stdout);
+}
+
+//-----------------------------------------------------------------------
+
 const int CreatureObject::grantExperiencePoints(const std::string & experienceType, int amount)
 {
 	if (isPlayerControlled())
@@ -3639,6 +3669,26 @@ const bool CreatureObject::grantSkill(const SkillObject & newSkill)
 		if (hasSkill (newSkill))
 			return true;
 
+		// pre-CU skillpoint check -- POINTS_REQUIRED from skills.tab must not
+		// exceed what's left in the pool. Zero-cost skills (novice boxes granted
+		// by other means, etc.) always pass through untouched.
+		int const skillPointCost = newSkill.getSkillPointsRequired();
+		printf("DEBUG grantSkill: skill=%s cost=%d pool=%d objectId=%s pid=%d\n",
+			newSkill.getSkillName().c_str(),
+			skillPointCost,
+			m_availableSkillPoints.get(),
+			getNetworkId().getValueString().c_str(),
+			static_cast<int>(getpid()));
+		fflush(stdout);
+		if (skillPointCost > m_availableSkillPoints.get())
+		{
+			if (getClient())
+			{
+				Chat::sendSystemMessage(*this, SharedStringIds::not_enough_skill_points, Unicode::emptyString);
+			}
+			return false;
+		}
+
 		// signal scripts that skill is about to be granted.  If the script returns override, cancel skill grant.
 		{
 			ScriptParams params;
@@ -3650,6 +3700,8 @@ const bool CreatureObject::grantSkill(const SkillObject & newSkill)
 		}
 
 		m_skills.insert(&newSkill);
+		if (skillPointCost > 0)
+			m_availableSkillPoints = m_availableSkillPoints.get() - skillPointCost;
 		if(getClient())
 		{
 			LOG("CustomerService", ("Skill: Account %s CharacterId %s has acquired skill %s", getClient()->getAccountName().c_str(), getNetworkId().getValueString().c_str(), newSkill.getSkillName().c_str()));
@@ -3755,7 +3807,13 @@ void CreatureObject::revokeSkill(const SkillObject & oldSkill, bool silent)
 					}
 				}
 
+				// after
 				m_skills.erase(&oldSkill);
+				{
+					int const refund = oldSkill.getSkillPointsRequired();
+					if (refund > 0)
+						m_availableSkillPoints = m_availableSkillPoints.get() + refund;
+				}
 				if(getClient())
 				{
 					LOG("CustomerService", ("Skill: Account %s CharacterId %s has lost skill %s", getClient()->getAccountName().c_str(), getNetworkId().getValueString().c_str(), oldSkill.getSkillName().c_str()));

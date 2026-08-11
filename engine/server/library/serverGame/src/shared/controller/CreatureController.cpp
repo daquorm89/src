@@ -1903,25 +1903,18 @@ bool CreatureController::shouldHibernate() const
 {
 	if (!ConfigServerGame::getHibernateEnabled())
 		return false;
-
 	// ----------
-
 	CreatureObject const * creature = getCreature();
 	NOT_NULL(creature);
 
-	// If the creature is static, it hibernates.
+	bool const isStatic = creature->getIsStatic();
+	int const proxyCount = creature->getProxyCount();
+	int const observersCount = creature->getObserversCount();
+	bool const result = isStatic ? true :
+		(!ConfigServerGame::getHibernateProxies() && proxyCount > 0) ? false :
+		(observersCount <= 0);
 
-	if (creature->getIsStatic())
-		return true;
-
-	// If proxied creatures aren't allowed to hibernate and this creature is proxied,
-	// it's not hibernating.
-
-	if (!ConfigServerGame::getHibernateProxies() && (creature->getProxyCount() > 0))
-		return false;
-
-	// if any players are observing me, don't hibernate
-	return creature->getObserversCount() <= 0;
+	return result;
 }
 
 // ----------------------------------------------------------------------

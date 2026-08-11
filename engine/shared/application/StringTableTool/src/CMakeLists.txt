@@ -1,0 +1,29 @@
+set(SHARED_SOURCES
+    shared/StringTableTool.cpp
+    shared/FirstStringTableTool.cpp
+    shared/FirstStringTableTool.h
+)
+include_directories(
+${CMAKE_CURRENT_SOURCE_DIR}/shared
+${SWG_ENGINE_SOURCE_DIR}/shared/library/sharedDebug/include/public
+    ${SWG_ENGINE_SOURCE_DIR}/shared/library/sharedFile/include/public
+${SWG_ENGINE_SOURCE_DIR}/shared/library/sharedFoundation/include/public
+${SWG_ENGINE_SOURCE_DIR}/shared/library/sharedFoundationTypes/include/public
+    ${SWG_ENGINE_SOURCE_DIR}/shared/library/sharedThread/include/public
+    ${SWG_EXTERNALS_SOURCE_DIR}/ours/library/fileInterface/include/public
+    ${SWG_EXTERNALS_SOURCE_DIR}/ours/library/localization/include
+    ${SWG_EXTERNALS_SOURCE_DIR}/ours/library/unicode/include
+)
+add_executable(StringTableTool
+${SHARED_SOURCES}
+)
+target_link_libraries(StringTableTool
+    sharedDebug
+    sharedFile
+    sharedFoundation
+    sharedThread
+    fileInterface
+    localization
+    unicode
+    ${CMAKE_DL_LIBS}
+)

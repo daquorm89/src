@@ -1,4 +1,5 @@
 
 add_subdirectory(DataTableTool)
+add_subdirectory(StringTableTool)
 add_subdirectory(TemplateCompiler)
 add_subdirectory(TemplateDefinitionCompiler)

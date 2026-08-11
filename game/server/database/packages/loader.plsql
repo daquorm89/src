@@ -818,7 +818,9 @@ procedure verify_character (p_station_id in number, p_character_id in number, p_
 				t.persisted_buffs,
 				t.ws_x,
 				t.ws_y,
-				t.ws_z
+				t.ws_z,
+				t.available_skill_points
+
 			from
 				object_list l,
 				creature_objects t

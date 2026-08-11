@@ -115,6 +115,7 @@ CreatureObject              m_group                  shared_np            Networ
 CreatureObject              m_groupInviter           shared_np            NetworkId
 CreatureObject              m_inviterForPendingGroup server_np            NetworkId
 CreatureObject              m_guildId                shared_np            int
+CreatureObject              m_availableSkillPoints   shared               int
 CreatureObject              m_lookAtTarget           shared_np            NetworkId
 CreatureObject              m_intendedTarget         shared_np            NetworkId
 CreatureObject              m_mood                   shared_np            char
