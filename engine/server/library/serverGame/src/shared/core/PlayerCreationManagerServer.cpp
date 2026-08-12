@@ -74,7 +74,7 @@ bool PlayerCreationManagerServer::setupPlayer(CreatureObject & obj, const std::s
 	//-- pre-CU skillpoint pool -- must be set before any grantSkill() call,
 	//-- including the newbie-tutorial-deferred novice grant (newbie_skipped.java)
 	//-- and the TESTCENTER bounty-hunter block further down in this function.
-	static int const cs_startingSkillPoints = 250; // TODO: make server-configurable later
+	static int const cs_startingSkillPoints = 2336; // TODO: make server-configurable later
 	obj.setAvailableSkillPoints (cs_startingSkillPoints);
 
 	//----------------------------------------------------------------------
