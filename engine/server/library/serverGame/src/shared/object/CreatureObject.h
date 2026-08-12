@@ -914,7 +914,7 @@ private:
 	Archive::AutoDeltaMap<std::string, std::pair<int, int> >   m_modMap;        // sync calculated mod information with client and server (pistol_accuracy, for example)
 
 	Archive::AutoDeltaSet<const SkillObject *>    m_skills;
-	Archive::AutoDeltaVariable<int>               m_availableSkillPoints;   // pre-CU skillpoint pool (starts at 250, see PlayerCreationManagerServer)
+	Archive::AutoDeltaVariable<int>               m_availableSkillPoints;   // pre-CU skillpoint pool (starts at 2336, see PlayerCreationManagerServer)
 
 	// Mission system related data
 	ServerObject *                                   m_missionTerminal;
