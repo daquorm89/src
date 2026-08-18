@@ -321,6 +321,7 @@ void ConfigServerGame::install(void)
 	KEY_FLOAT   (behaviorMaxAvoidanceStuckTime, 10.0f);
 	KEY_INT     (behaviorMaxAvoidancePersistenceFrameCount, 4);
 	KEY_BOOL    (shipsEnabled, true);
+	KEY_BOOL    (allowAtmosphericFlight, true);
 	KEY_BOOL    (logoutTriggerEnabled, true);
 	KEY_BOOL    (loginAsBountyHunter, false);
 	KEY_INT     (veteranRewardTradeInWaitPeriodSeconds, 30 * 24 * 60 * 60); // 30 days

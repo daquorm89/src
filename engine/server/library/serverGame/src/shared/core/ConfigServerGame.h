@@ -373,6 +373,7 @@ class ConfigServerGame
 		float           behaviorMaxAvoidanceStuckTime;
 		int             behaviorMaxAvoidancePersistenceFrameCount;
 		bool            shipsEnabled;
+		bool            allowAtmosphericFlight;
 		bool            logoutTriggerEnabled;
 
 		int             veteranRewardTradeInWaitPeriodSeconds;
@@ -901,6 +902,7 @@ class ConfigServerGame
 	static float            getBehaviorMaxAvoidanceStuckTime();
 	static int              getBehaviorMaxAvoidancePersistenceFrameCount();
 	static bool             getShipsEnabled();
+	static bool             getAllowAtmosphericFlight();
 	static bool             getLogoutTriggerEnabled();
 
 	static int              getVeteranRewardTradeInWaitPeriodSeconds();
@@ -2761,6 +2763,13 @@ inline bool ConfigServerGame::getFatalOnMovingGoldObject()
 inline bool ConfigServerGame::getShipsEnabled()
 {
 	return data->shipsEnabled;
+}
+
+// ----------------------------------------------------------------------
+
+inline bool ConfigServerGame::getAllowAtmosphericFlight()
+{
+	return data->allowAtmosphericFlight;
 }
 
 // ----------------------------------------------------------------------
