@@ -374,6 +374,10 @@ class ConfigServerGame
 		int             behaviorMaxAvoidancePersistenceFrameCount;
 		bool            shipsEnabled;
 		bool            allowAtmosphericFlight;
+		float           atmosphericLandingSpeedThreshold;
+		float           atmosphericLandingSlopeTolerance;
+		float           atmosphericCollisionDamageSpeedThreshold;
+		float           atmosphericCollisionDamageScale;
 		bool            logoutTriggerEnabled;
 
 		int             veteranRewardTradeInWaitPeriodSeconds;
@@ -903,6 +907,10 @@ class ConfigServerGame
 	static int              getBehaviorMaxAvoidancePersistenceFrameCount();
 	static bool             getShipsEnabled();
 	static bool             getAllowAtmosphericFlight();
+	static float            getAtmosphericLandingSpeedThreshold();
+	static float            getAtmosphericLandingSlopeTolerance();
+	static float            getAtmosphericCollisionDamageSpeedThreshold();
+	static float            getAtmosphericCollisionDamageScale();
 	static bool             getLogoutTriggerEnabled();
 
 	static int              getVeteranRewardTradeInWaitPeriodSeconds();
@@ -2770,6 +2778,34 @@ inline bool ConfigServerGame::getShipsEnabled()
 inline bool ConfigServerGame::getAllowAtmosphericFlight()
 {
 	return data->allowAtmosphericFlight;
+}
+
+// ----------------------------------------------------------------------
+
+inline float ConfigServerGame::getAtmosphericLandingSpeedThreshold()
+{
+	return data->atmosphericLandingSpeedThreshold;
+}
+
+// ----------------------------------------------------------------------
+
+inline float ConfigServerGame::getAtmosphericLandingSlopeTolerance()
+{
+	return data->atmosphericLandingSlopeTolerance;
+}
+
+// ----------------------------------------------------------------------
+
+inline float ConfigServerGame::getAtmosphericCollisionDamageSpeedThreshold()
+{
+	return data->atmosphericCollisionDamageSpeedThreshold;
+}
+
+// ----------------------------------------------------------------------
+
+inline float ConfigServerGame::getAtmosphericCollisionDamageScale()
+{
+	return data->atmosphericCollisionDamageScale;
 }
 
 // ----------------------------------------------------------------------
