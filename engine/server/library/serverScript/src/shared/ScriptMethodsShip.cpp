@@ -140,6 +140,7 @@ namespace ScriptMethodsShipNamespace
 	// ground via ShipController::respondToTerrainCollision(). Always false
 	// in space (no terrain collision runs there).
 	jboolean     JNICALL isShipLanded(JNIEnv * env, jobject self, jlong shipId);
+	jboolean     JNICALL setShipLanded(JNIEnv * env, jobject self, jlong shipId, jboolean landed);
 	jfloat       JNICALL getShipCurrentSpeed(JNIEnv * env, jobject self, jlong shipId);
 	jboolean     JNICALL setShipSlideDampener(JNIEnv * env, jobject self, jlong shipId, jfloat slideDampener);
 	jfloat       JNICALL getShipSlideDampener(JNIEnv * env, jobject self, jlong shipId);
@@ -379,6 +380,7 @@ const JNINativeMethod NATIVES[] = {
 	JF("_getPilotedShip", "(J)J", getPilotedShip),
 	JF("_getShipHasWings", "(J)Z", getShipHasWings),
 	JF("_isShipLanded", "(J)Z", isShipLanded),
+	JF("_setShipLanded", "(JZ)Z", setShipLanded),
 	JF("_getShipCurrentSpeed", "(J)F", getShipCurrentSpeed),
 	JF("_setShipSlideDampener", "(JF)Z", setShipSlideDampener),
 	JF("_getShipSlideDampener", "(J)F", getShipSlideDampener),
@@ -758,6 +760,26 @@ jboolean JNICALL ScriptMethodsShipNamespace::isShipLanded(JNIEnv * env, jobject 
 		return JNI_FALSE;
 
 	return shipController->isLanded() ? JNI_TRUE : JNI_FALSE;
+}
+
+// ----------------------------------------------------------------------
+
+jboolean JNICALL ScriptMethodsShipNamespace::setShipLanded(JNIEnv * env, jobject /*self*/, jlong jobject_shipId, jboolean landed)
+{
+	//-- Make sure ships are enabled
+	if (!verifyShipsEnabled())
+		return JNI_FALSE;
+
+	ShipObject * const shipObject = JavaLibrary::getShipThrow(env, jobject_shipId, "setShipLanded(): shipId obj_id did not resolve to a ShipObject", false);
+	if (!shipObject)
+		return JNI_FALSE;
+
+	ShipController * const shipController = safe_cast<ShipController *>(shipObject->getController());
+	if (!shipController)
+		return JNI_FALSE;
+
+	shipController->setLanded(landed == JNI_TRUE);
+	return JNI_TRUE;
 }
 
 // ----------------------------------------------------------------------

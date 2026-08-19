@@ -336,6 +336,13 @@ bool ShipController::isLanded() const
 
 // ----------------------------------------------------------------------
 
+void ShipController::setLanded(bool landed)
+{
+	m_isLanded = landed;
+}
+
+// ----------------------------------------------------------------------
+
 float ShipController::realAlter(float elapsedTime)
 {
 	PROFILER_AUTO_BLOCK_DEFINE("ShipController::realAlter");

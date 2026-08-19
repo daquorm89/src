@@ -63,6 +63,9 @@ public:
 	// always bouncing, while a hard/steep impact still collides normally.
 	void respondToTerrainCollision(Vector const & deltaToMove_p, Vector const & newReflection_p, Vector const & normalOfSurface_p);
 	bool isLanded() const;
+	// Explicitly mark landed/not-landed (e.g. after unpackShip on ground
+	// places a ship at rest without a collision event ever firing).
+	void setLanded(bool landed);
 
 	ShipObject * getShipOwner();
 	ShipObject const * getShipOwner() const;
