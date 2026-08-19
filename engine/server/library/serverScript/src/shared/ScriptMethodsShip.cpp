@@ -22,6 +22,7 @@
 #include "serverGame/Pvp.h"
 #include "serverGame/ServerObjectTemplate.h"
 #include "serverGame/ServerWorld.h"
+#include "serverGame/ShipController.h"
 #include "serverGame/ShipInternalDamageOverTime.h"
 #include "serverGame/ShipInternalDamageOverTimeManager.h"
 #include "serverGame/ShipObject.h"
@@ -135,6 +136,10 @@ namespace ScriptMethodsShipNamespace
 	jlong        JNICALL getShipPilot(JNIEnv * env, jobject self, jlong shipId);
 	jlong        JNICALL getPilotedShip(JNIEnv * env, jobject self, jlong pilotId);
 	jboolean     JNICALL getShipHasWings(JNIEnv * env, jobject self, jlong shipId);
+	// P9 atmospheric flight: true once a piloted ship has settled onto the
+	// ground via ShipController::respondToTerrainCollision(). Always false
+	// in space (no terrain collision runs there).
+	jboolean     JNICALL isShipLanded(JNIEnv * env, jobject self, jlong shipId);
 	jfloat       JNICALL getShipCurrentSpeed(JNIEnv * env, jobject self, jlong shipId);
 	jboolean     JNICALL setShipSlideDampener(JNIEnv * env, jobject self, jlong shipId, jfloat slideDampener);
 	jfloat       JNICALL getShipSlideDampener(JNIEnv * env, jobject self, jlong shipId);
@@ -373,6 +378,7 @@ const JNINativeMethod NATIVES[] = {
 	JF("_getShipPilot", "(J)J", getShipPilot),
 	JF("_getPilotedShip", "(J)J", getPilotedShip),
 	JF("_getShipHasWings", "(J)Z", getShipHasWings),
+	JF("_isShipLanded", "(J)Z", isShipLanded),
 	JF("_getShipCurrentSpeed", "(J)F", getShipCurrentSpeed),
 	JF("_setShipSlideDampener", "(JF)Z", setShipSlideDampener),
 	JF("_getShipSlideDampener", "(J)F", getShipSlideDampener),
@@ -729,6 +735,29 @@ jboolean JNICALL ScriptMethodsShipNamespace::getShipHasWings(JNIEnv * env, jobje
 		return JNI_FALSE;
 
 	return JNI_TRUE;
+}
+
+// ----------------------------------------------------------------------
+//
+// P9 atmospheric flight.
+//
+// ----------------------------------------------------------------------
+
+jboolean JNICALL ScriptMethodsShipNamespace::isShipLanded(JNIEnv * env, jobject /*self*/, jlong jobject_shipId)
+{
+	//-- Make sure ships are enabled
+	if (!verifyShipsEnabled())
+		return JNI_FALSE;
+
+	ShipObject const * const shipObject = JavaLibrary::getShipThrow(env, jobject_shipId, "isShipLanded(): shipId obj_id did not resolve to a ShipObject", false);
+	if (!shipObject)
+		return JNI_FALSE;
+
+	ShipController const * const shipController = safe_cast<ShipController const *>(shipObject->getController());
+	if (!shipController)
+		return JNI_FALSE;
+
+	return shipController->isLanded() ? JNI_TRUE : JNI_FALSE;
 }
 
 // ----------------------------------------------------------------------
