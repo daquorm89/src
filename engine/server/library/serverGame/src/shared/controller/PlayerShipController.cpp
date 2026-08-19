@@ -190,16 +190,46 @@ void PlayerShipController::receiveTransform(ShipUpdateTransformMessage const & s
 	{
 		m_clientToServerLastSyncStamp = syncStamp;
 
-		Transform const &transform = shipUpdateTransformMessage.getTransform();
+		Transform transform = shipUpdateTransformMessage.getTransform();
 		Vector const &velocity = shipUpdateTransformMessage.getVelocity();
 		float const speed = velocity.magnitude();
+
+		// P9: clamp below-terrain moves up onto the surface and push the
+		// correction to the client. Reject-only left the client free to
+		// keep flying through the ground until an old lastVerified was
+		// applied (or never, if validation was loose).
+		bool clampedToTerrain = false;
+		if (ConfigServerGame::getAllowAtmosphericFlight())
+		{
+			TerrainObject const * const terrain = TerrainObject::getConstInstance();
+			if (terrain)
+			{
+				Vector pos = transform.getPosition_p();
+				float terrainHeight = 0.f;
+				if (terrain->getHeight(pos, terrainHeight))
+				{
+					float const minY = terrainHeight + 1.0f;
+					if (pos.y < minY)
+					{
+						pos.y = minY;
+						transform.setPosition_p(pos);
+						clampedToTerrain = true;
+					}
+				}
+			}
+		}
 
 		if (!checkValidMove(transform, velocity, speed, syncStamp))
 			teleport(m_lastVerifiedTransform, 0);
 		else
 		{
 			m_shipDynamicsModel->setTransform(transform);
-			m_shipDynamicsModel->setVelocity(velocity);
+			m_shipDynamicsModel->setVelocity(clampedToTerrain ? Vector::zero : velocity);
+			if (clampedToTerrain)
+			{
+				owner->setTransform_o2p(transform);
+				teleport(transform, 0);
+			}
 
 			ServerShipObjectInterface const serverShipObjectInterface(owner);
 
