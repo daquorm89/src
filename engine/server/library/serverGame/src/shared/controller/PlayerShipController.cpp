@@ -35,6 +35,7 @@
 #include "sharedNetworkMessages/ShipUpdateTransformMessage.h"
 #include "sharedObject/AlterResult.h"
 #include "sharedObject/NetworkIdManager.h"
+#include "sharedTerrain/TerrainObject.h"
 
 #include <limits>
 #include <map>
@@ -728,6 +729,38 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 			return false;
 		}
 	}
+
+	// P9 atmospheric flight: player ships are client-authoritative, so the
+	// CollisionWorld terrain callback never runs for them. Enforce a floor
+	// here so the server rejects (and teleports back from) moves that dig
+	// into the ground. Only active when atmospheric flight is enabled and
+	// this process is a ground scene (TerrainObject exists).
+	if (ConfigServerGame::getAllowAtmosphericFlight())
+	{
+		TerrainObject const * const terrain = TerrainObject::getConstInstance();
+		if (terrain)
+		{
+			Vector const pos = transform.getPosition_p();
+			float terrainHeight = 0.f;
+			if (terrain->getHeight(pos, terrainHeight))
+			{
+				// small clearance so a landed ship resting on the surface is fine
+				float const minY = terrainHeight + 0.5f;
+				if (pos.y < minY)
+				{
+					logMoveFail("below terrain (y=%g, terrain=%g)", pos.y, terrainHeight);
+					return false;
+				}
+			}
+		}
+	}
+
+	// When nearly stationary on a ground scene, treat as landed so scripts
+	// that still consult isShipLanded() keep working after a C++ rebuild.
+	if (ConfigServerGame::getAllowAtmosphericFlight() && TerrainObject::getConstInstance() && speed < 0.5f)
+		m_isLanded = true;
+	else if (speed > 2.0f)
+		m_isLanded = false;
 
 	UNREF(velocity);
 	m_lastVerifiedTransform = transform;
