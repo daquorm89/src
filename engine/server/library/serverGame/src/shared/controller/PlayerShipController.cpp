@@ -190,46 +190,23 @@ void PlayerShipController::receiveTransform(ShipUpdateTransformMessage const & s
 	{
 		m_clientToServerLastSyncStamp = syncStamp;
 
-		Transform transform = shipUpdateTransformMessage.getTransform();
+		Transform const &transform = shipUpdateTransformMessage.getTransform();
 		Vector const &velocity = shipUpdateTransformMessage.getVelocity();
 		float const speed = velocity.magnitude();
 
-		// P9: clamp below-terrain moves up onto the surface and push the
-		// correction to the client. Reject-only left the client free to
-		// keep flying through the ground until an old lastVerified was
-		// applied (or never, if validation was loose).
-		bool clampedToTerrain = false;
-		if (ConfigServerGame::getAllowAtmosphericFlight())
-		{
-			TerrainObject const * const terrain = TerrainObject::getConstInstance();
-			if (terrain)
-			{
-				Vector pos = transform.getPosition_p();
-				float terrainHeight = 0.f;
-				if (terrain->getHeight(pos, terrainHeight))
-				{
-					float const minY = terrainHeight + 1.0f;
-					if (pos.y < minY)
-					{
-						pos.y = minY;
-						transform.setPosition_p(pos);
-						clampedToTerrain = true;
-					}
-				}
-			}
-		}
+		// Note (P9 atmospheric flight): real ship-vs-terrain / building collision
+		// cannot be done correctly here. Player ships are client-authoritative;
+		// space uses client-side collision (ShipUpdateTransformCollisionMessage).
+		// Server-side Y-clamp/teleport was removed — it felt wrong and still did
+		// not provide proper collision. True atmospheric collision needs the
+		// client ShipController path (client-tools), not a server floor hack.
 
 		if (!checkValidMove(transform, velocity, speed, syncStamp))
 			teleport(m_lastVerifiedTransform, 0);
 		else
 		{
 			m_shipDynamicsModel->setTransform(transform);
-			m_shipDynamicsModel->setVelocity(clampedToTerrain ? Vector::zero : velocity);
-			if (clampedToTerrain)
-			{
-				owner->setTransform_o2p(transform);
-				teleport(transform, 0);
-			}
+			m_shipDynamicsModel->setVelocity(velocity);
 
 			ServerShipObjectInterface const serverShipObjectInterface(owner);
 
@@ -760,33 +737,8 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 		}
 	}
 
-	// P9 atmospheric flight: player ships are client-authoritative, so the
-	// CollisionWorld terrain callback never runs for them. Enforce a floor
-	// here so the server rejects (and teleports back from) moves that dig
-	// into the ground. Only active when atmospheric flight is enabled and
-	// this process is a ground scene (TerrainObject exists).
-	if (ConfigServerGame::getAllowAtmosphericFlight())
-	{
-		TerrainObject const * const terrain = TerrainObject::getConstInstance();
-		if (terrain)
-		{
-			Vector const pos = transform.getPosition_p();
-			float terrainHeight = 0.f;
-			if (terrain->getHeight(pos, terrainHeight))
-			{
-				// small clearance so a landed ship resting on the surface is fine
-				float const minY = terrainHeight + 0.5f;
-				if (pos.y < minY)
-				{
-					logMoveFail("below terrain (y=%g, terrain=%g)", pos.y, terrainHeight);
-					return false;
-				}
-			}
-		}
-	}
-
-	// When nearly stationary on a ground scene, treat as landed so scripts
-	// that still consult isShipLanded() keep working after a C++ rebuild.
+	// P9: track landed from near-zero speed on ground (scripts / exit UX).
+	// No server terrain rejection — see comment in receiveTransform.
 	if (ConfigServerGame::getAllowAtmosphericFlight() && TerrainObject::getConstInstance() && speed < 0.5f)
 		m_isLanded = true;
 	else if (speed > 2.0f)
