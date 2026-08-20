@@ -433,6 +433,19 @@ void ObserveTracker::onObjectMadeVisibleTo(ServerObject &obj, const std::vector<
 
 // ----------------------------------------------------------------------
 
+void ObserveTracker::forceClientResync(Client &client, ServerObject &obj)
+{
+	// Drop the client's view of obj (send destroy), then observe again so
+	// create/baselines carry the current server transform. Used when a
+	// parked atmospheric ship is moved without an authority client.
+	if (isObserving(client, obj))
+		unobserve(client, obj, true);
+	if (obj.isVisibleOnClient(client))
+		IGNORE_RETURN(observe(client, obj, 0));
+}
+
+// ----------------------------------------------------------------------
+
 void ObserveTracker::onClientDestroyed(Client &client)
 {
 	// client is being destroyed, so clean up observation related references

@@ -51,6 +51,8 @@ public:
 	static void onMissionCriticalObjectAdded(ServerObject const &playerObject, ServerObject &criticalShip);
 	static void onMakeVendorInventory(ServerObject &vendorInventory, std::set<Client *> const & oldInventoryObservers);
 	static void onClientAboutToOpenPublicContainer(Client & client, ServerObject & container);
+	/** P9: destroy+recreate object on one client so transform/baselines resync. */
+	static void forceClientResync(Client &client, ServerObject &obj);
 };
 
 // ======================================================================

@@ -150,6 +150,16 @@ bool CreatureObject::unpilotShip()
 		ShipClientUpdateTracker::queueForUpdate(*client, *ship);
 	}
 
+	// P9 atmospheric: after leaving the pilot seat on a ground planet the
+	// ship must stay visible and at the server position. Without this the
+	// client often drops the vessel (or keeps a ghost at an old transform)
+	// until a god-mode relog.
+	if (unpilotedShip && ship && ConfigServerGame::getAllowAtmosphericFlight()
+	    && !ServerWorld::isSpaceScene())
+	{
+		ship->forceOwnerObserveAtmospheric();
+	}
+
 	return unpilotedShip;
 }
 

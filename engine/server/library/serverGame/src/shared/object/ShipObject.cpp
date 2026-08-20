@@ -37,6 +37,7 @@
 #include "serverGame/ShipComponentDataShield.h"
 #include "serverGame/ShipComponentDataWeapon.h"
 #include "serverGame/ShipController.h"
+#include "serverGame/ShipClientUpdateTracker.h"
 #include "serverScript/GameScriptObject.h"
 #include "serverScript/ScriptParameters.h"
 #include "sharedFoundation/BitArray.h"
@@ -522,20 +523,29 @@ void ShipObject::forceOwnerObserveAtmospheric()
 	if (!client)
 		return;
 
-	// Ensure visibility rule allows the owner, then push create/baselines.
-	std::vector<ServerObject *> observers;
-	observers.push_back(ownerObj);
-	ObserveTracker::onObjectMadeVisibleTo(*this, observers);
+	// Keep object transform aligned with dynamics (client-auth flight updates
+	// the model first; observers need the ServerObject transform current).
+	ShipController * const shipController = safe_cast<ShipController *>(getController());
+	if (shipController)
+	{
+		Transform const &dyn = shipController->getTransform();
+		if (getTransform_o2p() != dyn)
+			setTransform_o2p(dyn);
+	}
 
-	// If observe path still missed (e.g. ship was already isInWorld while
-	// nested under the SCD and never got a fresh onAddedToWorld), force
-	// baselines when the owner is not yet observing us.
+	// Destroy+recreate on the owner client so the ship appears at the
+	// current server transform (fixes ghost-at-old-spot / invisible ship).
+	if (isVisibleOnClient(*client))
+		ObserveTracker::forceClientResync(*client, *this);
+
 	if (!ObserveTracker::isObserving(*client, *this) && isVisibleOnClient(*client))
 	{
 		client->addObserving(this);
 		IGNORE_RETURN(addObserver(client));
 		sendCreateAndBaselinesToClient(*client);
 	}
+
+	ShipClientUpdateTracker::queueForUpdate(*client, *this);
 }
 
 // ----------------------------------------------------------------------
