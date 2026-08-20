@@ -82,6 +82,7 @@ public:
 	virtual void onContainerLostItem(ServerObject *destination, ServerObject &item, ServerObject *transferer);
 	virtual void onContainerChildLostItem(ServerObject *destination, ServerObject &item, ServerObject *source, ServerObject *transferer);
 	virtual bool isVisibleOnClient(const Client & client) const;
+	void forceOwnerObserveAtmospheric();
 	virtual void onLoadingScreenComplete();
 
 	CreatureObject const *getPilot() const;

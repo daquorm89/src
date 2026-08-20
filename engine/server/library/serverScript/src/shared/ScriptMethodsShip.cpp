@@ -779,6 +779,14 @@ jboolean JNICALL ScriptMethodsShipNamespace::setShipLanded(JNIEnv * env, jobject
 		return JNI_FALSE;
 
 	shipController->setLanded(landed == JNI_TRUE);
+
+	// P9: placeShipInWorldForPlayer always calls setShipLanded(true). That
+	// is a reliable post-placement hook even when the ship was already
+	// considered isInWorld while nested under the SCD (so onAddedToWorld
+	// never ran). Force the owner client to observe the parked ship.
+	if (landed == JNI_TRUE)
+		shipObject->forceOwnerObserveAtmospheric();
+
 	return JNI_TRUE;
 }
 

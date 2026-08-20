@@ -503,6 +503,43 @@ ShipObject const * ShipObject::asShipObject() const
 
 // ----------------------------------------------------------------------
 
+void ShipObject::forceOwnerObserveAtmospheric()
+{
+	if (!ConfigServerGame::getAllowAtmosphericFlight())
+		return;
+	if (!isPlayerShip() || ServerWorld::isSpaceScene())
+		return;
+
+	NetworkId const &ownerId = getOwnerId();
+	if (ownerId == NetworkId::cms_invalid)
+		return;
+
+	ServerObject * const ownerObj = ServerWorld::findObjectByNetworkId(ownerId);
+	if (!ownerObj)
+		return;
+
+	Client * const client = ownerObj->getClient();
+	if (!client)
+		return;
+
+	// Ensure visibility rule allows the owner, then push create/baselines.
+	std::vector<ServerObject *> observers;
+	observers.push_back(ownerObj);
+	ObserveTracker::onObjectMadeVisibleTo(*this, observers);
+
+	// If observe path still missed (e.g. ship was already isInWorld while
+	// nested under the SCD and never got a fresh onAddedToWorld), force
+	// baselines when the owner is not yet observing us.
+	if (!ObserveTracker::isObserving(*client, *this) && isVisibleOnClient(*client))
+	{
+		client->addObserving(this);
+		IGNORE_RETURN(addObserver(client));
+		sendCreateAndBaselinesToClient(*client);
+	}
+}
+
+// ----------------------------------------------------------------------
+
 void ShipObject::onAddedToWorld()
 {
 	if (isPlayerShip() && !getClient())
@@ -511,26 +548,8 @@ void ShipObject::onAddedToWorld()
 	NON_NULL(safe_cast<ShipController *>(getController()))->onAddedToWorld();
 	TangibleObject::onAddedToWorld();
 
-	// P9 atmospheric flight: parked ships on the ground are invisible to
-	// non-contained clients unless isVisibleOnClient allows the owner.
-	// Force the owner to observe the ship immediately so Call Ship does
-	// not require a relog to see it.
-	if (ConfigServerGame::getAllowAtmosphericFlight()
-	    && isPlayerShip()
-	    && !ServerWorld::isSpaceScene())
-	{
-		NetworkId const &ownerId = getOwnerId();
-		if (ownerId != NetworkId::cms_invalid)
-		{
-			ServerObject * const ownerObj = ServerWorld::findObjectByNetworkId(ownerId);
-			if (ownerObj && ownerObj->getClient())
-			{
-				std::vector<ServerObject *> observers;
-				observers.push_back(ownerObj);
-				ObserveTracker::onObjectMadeVisibleTo(*this, observers);
-			}
-		}
-	}
+	// P9: owner must see a parked atmospheric ship without a god relog.
+	forceOwnerObserveAtmospheric();
 }
 
 // ----------------------------------------------------------------------
