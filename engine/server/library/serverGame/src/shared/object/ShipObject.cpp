@@ -6,6 +6,7 @@
 // ======================================================================
 
 #include "serverGame/FirstServerGame.h"
+#include "serverGame/Client.h"
 #include "serverGame/ShipObject.h"
 
 #include "UnicodeUtils.h"
@@ -509,6 +510,27 @@ void ShipObject::onAddedToWorld()
 
 	NON_NULL(safe_cast<ShipController *>(getController()))->onAddedToWorld();
 	TangibleObject::onAddedToWorld();
+
+	// P9 atmospheric flight: parked ships on the ground are invisible to
+	// non-contained clients unless isVisibleOnClient allows the owner.
+	// Force the owner to observe the ship immediately so Call Ship does
+	// not require a relog to see it.
+	if (ConfigServerGame::getAllowAtmosphericFlight()
+	    && isPlayerShip()
+	    && !ServerWorld::isSpaceScene())
+	{
+		NetworkId const &ownerId = getOwnerId();
+		if (ownerId != NetworkId::cms_invalid)
+		{
+			ServerObject * const ownerObj = ServerWorld::findObjectByNetworkId(ownerId);
+			if (ownerObj && ownerObj->getClient())
+			{
+				std::vector<ServerObject *> observers;
+				observers.push_back(ownerObj);
+				ObserveTracker::onObjectMadeVisibleTo(*this, observers);
+			}
+		}
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -576,6 +598,18 @@ bool ShipObject::isVisibleOnClient(Client const &client) const
 	for (ServerObject const *o = client.getCharacterObject(); o; o = safe_cast<ServerObject const *>(ContainerInterface::getContainedByObject(*o)))
 		if (o == this)
 			return true;
+
+	// P9 atmospheric flight: parked player ships on the ground must be
+	// visible to their owner so Call Ship / re-board works. Without this,
+	// isVisibleOnClient returns false for everyone except gods and anyone
+	// already contained by the ship — the ship is in the world but never
+	// sent to the client until a relog (or god mode) happens to reveal it.
+	if (ConfigServerGame::getAllowAtmosphericFlight())
+	{
+		NetworkId const &ownerId = getOwnerId();
+		if (ownerId != NetworkId::cms_invalid && ownerId == client.getCharacterObjectId())
+			return true;
+	}
 
 	return false;
 }
