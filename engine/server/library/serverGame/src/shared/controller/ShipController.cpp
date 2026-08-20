@@ -339,6 +339,40 @@ bool ShipController::isLanded() const
 void ShipController::setLanded(bool landed)
 {
 	m_isLanded = landed;
+	if (!landed)
+		return;
+
+	// P9: when scripts (or landing code) mark a ship landed, force a settled
+	// state and snap to terrain. Player ships often never hit
+	// respondToTerrainCollision() (client-authoritative), so JNI setShipLanded
+	// is the only reliable path after Call Ship / unpack on a ground planet.
+	m_throttlePosition = 0.0f;
+	if (m_shipDynamicsModel)
+		m_shipDynamicsModel->setVelocity(Vector::zero);
+
+	ShipObject * const owner = getShipOwner();
+	if (!owner || !ConfigServerGame::getAllowAtmosphericFlight())
+		return;
+
+	TerrainObject const * const terrain = TerrainObject::getConstInstance();
+	if (!terrain || !m_shipDynamicsModel)
+		return;
+
+	Transform transform_p(m_shipDynamicsModel->getTransform());
+	Vector pos = transform_p.getPosition_p();
+	float terrainHeight = 0.0f;
+	if (!terrain->getHeight(pos, terrainHeight))
+		return;
+
+	// Rest slightly above the surface so the hull is not buried
+	float const clearance = 1.25f;
+	if (pos.y < terrainHeight + clearance + 0.01f || pos.y > terrainHeight + clearance + 5.0f)
+	{
+		pos.y = terrainHeight + clearance;
+		transform_p.setPosition_p(pos);
+		m_shipDynamicsModel->setTransform(transform_p);
+		owner->setTransform_o2p(transform_p);
+	}
 }
 
 // ----------------------------------------------------------------------

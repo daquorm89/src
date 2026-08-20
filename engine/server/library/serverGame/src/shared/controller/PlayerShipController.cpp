@@ -215,6 +215,11 @@ void PlayerShipController::receiveTransform(ShipUpdateTransformMessage const & s
 						transform.setPosition_p(pos);
 						clampedToTerrain = true;
 					}
+					// Near-ground and slow → treat as landed even without
+					// CollisionWorld terrain callbacks (player ships).
+					float const above = pos.y - terrainHeight;
+					if (above <= 4.0f && speed <= 2.0f)
+						m_isLanded = true;
 				}
 			}
 		}
@@ -229,6 +234,9 @@ void PlayerShipController::receiveTransform(ShipUpdateTransformMessage const & s
 			{
 				owner->setTransform_o2p(transform);
 				teleport(transform, 0);
+				// Contact with the floor after clamp is a soft landing
+				if (speed <= 2.0f)
+					m_isLanded = true;
 			}
 
 			ServerShipObjectInterface const serverShipObjectInterface(owner);
@@ -443,7 +451,40 @@ float PlayerShipController::realAlter(float const elapsedTime)
 
 		//-- Update flight model
 		ServerShipObjectInterface const serverShipObjectInterface(owner);
-		m_shipDynamicsModel->model(elapsedTime, m_yawPosition, m_pitchPosition, m_rollPosition, m_throttlePosition, serverShipObjectInterface);
+
+		// P9: while landed with no throttle, do not integrate dynamics
+		// (prevents drift through terrain when CollisionWorld is inactive).
+		// Throttle is cleared on setLanded; any non-zero throttle clears
+		// m_isLanded in ShipController::realAlter.
+		if (m_isLanded && m_throttlePosition <= 0.01f)
+		{
+			m_shipDynamicsModel->setVelocity(Vector::zero);
+			// Keep chassis on the terrain surface
+			if (ConfigServerGame::getAllowAtmosphericFlight())
+			{
+				TerrainObject const * const terrain = TerrainObject::getConstInstance();
+				if (terrain)
+				{
+					Transform transform_p(m_shipDynamicsModel->getTransform());
+					Vector pos = transform_p.getPosition_p();
+					float terrainHeight = 0.f;
+					if (terrain->getHeight(pos, terrainHeight))
+					{
+						float const targetY = terrainHeight + 1.25f;
+						if (pos.y < targetY - 0.05f || pos.y > targetY + 3.0f)
+						{
+							pos.y = targetY;
+							transform_p.setPosition_p(pos);
+							m_shipDynamicsModel->setTransform(transform_p);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			m_shipDynamicsModel->model(elapsedTime, m_yawPosition, m_pitchPosition, m_rollPosition, m_throttlePosition, serverShipObjectInterface);
+		}
 
 		//-- Update the server position based on the model
 		owner->setTransform_o2p(m_shipDynamicsModel->getTransform());
@@ -761,10 +802,8 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 	}
 
 	// P9 atmospheric flight: player ships are client-authoritative, so the
-	// CollisionWorld terrain callback never runs for them. Enforce a floor
-	// here so the server rejects (and teleports back from) moves that dig
-	// into the ground. Only active when atmospheric flight is enabled and
-	// this process is a ground scene (TerrainObject exists).
+	// CollisionWorld terrain callback often never runs for them. Enforce a
+	// floor here. Prefer clamp-in-receiveTransform; reject only if still deep.
 	if (ConfigServerGame::getAllowAtmosphericFlight())
 	{
 		TerrainObject const * const terrain = TerrainObject::getConstInstance();
@@ -774,21 +813,22 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 			float terrainHeight = 0.f;
 			if (terrain->getHeight(pos, terrainHeight))
 			{
-				// small clearance so a landed ship resting on the surface is fine
 				float const minY = terrainHeight + 0.5f;
-				if (pos.y < minY)
+				// Deep penetration: reject (teleport to last verified)
+				if (pos.y < minY - 2.0f)
 				{
 					logMoveFail("below terrain (y=%g, terrain=%g)", pos.y, terrainHeight);
 					return false;
 				}
+				// Near surface + slow → landed (scripts / leaveStation)
+				float const above = pos.y - terrainHeight;
+				if (above <= 4.0f && speed <= 2.0f)
+					m_isLanded = true;
+				else if (speed > 2.0f || above > 8.0f)
+					m_isLanded = false;
 			}
 		}
 	}
-
-	// When nearly stationary on a ground scene, treat as landed so scripts
-	// that still consult isShipLanded() keep working after a C++ rebuild.
-	if (ConfigServerGame::getAllowAtmosphericFlight() && TerrainObject::getConstInstance() && speed < 0.5f)
-		m_isLanded = true;
 	else if (speed > 2.0f)
 		m_isLanded = false;
 
