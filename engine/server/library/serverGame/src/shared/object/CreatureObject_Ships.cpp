@@ -16,6 +16,7 @@
 #include "serverGame/GroupObject.h"
 #include "serverGame/ShipClientUpdateTracker.h"
 #include "serverGame/ShipObject.h"
+#include "serverGame/ServerWorld.h"
 #include "sharedFoundation/ConstCharCrcLowerString.h"
 #include "sharedGame/ShipSlotIdManager.h"
 #include "sharedObject/CellProperty.h"
