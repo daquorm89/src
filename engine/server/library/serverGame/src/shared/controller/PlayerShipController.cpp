@@ -35,6 +35,12 @@
 #include "sharedNetworkMessages/ShipUpdateTransformMessage.h"
 #include "sharedObject/AlterResult.h"
 #include "sharedObject/NetworkIdManager.h"
+#include "sharedTerrain/TerrainObject.h"
+#include "sharedCollision/CollisionWorld.h"
+#include "sharedCollision/CollisionProperty.h"
+#include "sharedCollision/SpatialDatabase.h"
+#include "sharedMath/Capsule.h"
+#include "sharedObject/CellProperty.h"
 
 #include <limits>
 #include <map>
@@ -189,16 +195,54 @@ void PlayerShipController::receiveTransform(ShipUpdateTransformMessage const & s
 	{
 		m_clientToServerLastSyncStamp = syncStamp;
 
-		Transform const &transform = shipUpdateTransformMessage.getTransform();
+		Transform transform = shipUpdateTransformMessage.getTransform();
 		Vector const &velocity = shipUpdateTransformMessage.getVelocity();
 		float const speed = velocity.magnitude();
+
+		// P9: clamp below-terrain moves up onto the surface and push the
+		// correction to the client. Reject-only left the client free to
+		// keep flying through the ground until an old lastVerified was
+		// applied (or never, if validation was loose).
+		bool clampedToTerrain = false;
+		if (ConfigServerGame::getAllowAtmosphericFlight())
+		{
+			TerrainObject const * const terrain = TerrainObject::getConstInstance();
+			if (terrain)
+			{
+				Vector pos = transform.getPosition_p();
+				float terrainHeight = 0.f;
+				if (terrain->getHeight(pos, terrainHeight))
+				{
+					float const minY = terrainHeight + 1.0f;
+					if (pos.y < minY)
+					{
+						pos.y = minY;
+						transform.setPosition_p(pos);
+						clampedToTerrain = true;
+					}
+					// Near-ground and slow → treat as landed even without
+					// CollisionWorld terrain callbacks (player ships).
+					float const above = pos.y - terrainHeight;
+					if (above <= 4.0f && speed <= 2.0f)
+						m_isLanded = true;
+				}
+			}
+		}
 
 		if (!checkValidMove(transform, velocity, speed, syncStamp))
 			teleport(m_lastVerifiedTransform, 0);
 		else
 		{
 			m_shipDynamicsModel->setTransform(transform);
-			m_shipDynamicsModel->setVelocity(velocity);
+			m_shipDynamicsModel->setVelocity(clampedToTerrain ? Vector::zero : velocity);
+			if (clampedToTerrain)
+			{
+				owner->setTransform_o2p(transform);
+				teleport(transform, 0);
+				// Contact with the floor after clamp is a soft landing
+				if (speed <= 2.0f)
+					m_isLanded = true;
+			}
 
 			ServerShipObjectInterface const serverShipObjectInterface(owner);
 
@@ -412,7 +456,40 @@ float PlayerShipController::realAlter(float const elapsedTime)
 
 		//-- Update flight model
 		ServerShipObjectInterface const serverShipObjectInterface(owner);
-		m_shipDynamicsModel->model(elapsedTime, m_yawPosition, m_pitchPosition, m_rollPosition, m_throttlePosition, serverShipObjectInterface);
+
+		// P9: while landed with no throttle, do not integrate dynamics
+		// (prevents drift through terrain when CollisionWorld is inactive).
+		// Throttle is cleared on setLanded; any non-zero throttle clears
+		// m_isLanded in ShipController::realAlter.
+		if (m_isLanded && m_throttlePosition <= 0.01f)
+		{
+			m_shipDynamicsModel->setVelocity(Vector::zero);
+			// Keep chassis on the terrain surface
+			if (ConfigServerGame::getAllowAtmosphericFlight())
+			{
+				TerrainObject const * const terrain = TerrainObject::getConstInstance();
+				if (terrain)
+				{
+					Transform transform_p(m_shipDynamicsModel->getTransform());
+					Vector pos = transform_p.getPosition_p();
+					float terrainHeight = 0.f;
+					if (terrain->getHeight(pos, terrainHeight))
+					{
+						float const targetY = terrainHeight + 1.25f;
+						if (pos.y < targetY - 0.05f || pos.y > targetY + 3.0f)
+						{
+							pos.y = targetY;
+							transform_p.setPosition_p(pos);
+							m_shipDynamicsModel->setTransform(transform_p);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			m_shipDynamicsModel->model(elapsedTime, m_yawPosition, m_pitchPosition, m_rollPosition, m_throttlePosition, serverShipObjectInterface);
+		}
 
 		//-- Update the server position based on the model
 		owner->setTransform_o2p(m_shipDynamicsModel->getTransform());
@@ -728,6 +805,69 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 			return false;
 		}
 	}
+
+	// P9 atmospheric flight: player ships are client-authoritative, so the
+	// CollisionWorld terrain callback often never runs for them. Enforce a
+	// floor here. Prefer clamp-in-receiveTransform; reject only if still deep.
+	// Also reject moves that embed the ship in static obstacles (rocks, buildings).
+	if (ConfigServerGame::getAllowAtmosphericFlight())
+	{
+		Vector const pos = transform.getPosition_p();
+		TerrainObject const * const terrain = TerrainObject::getConstInstance();
+		if (terrain)
+		{
+			float terrainHeight = 0.f;
+			if (terrain->getHeight(pos, terrainHeight))
+			{
+				float const minY = terrainHeight + 0.5f;
+				// Deep penetration: reject (teleport to last verified)
+				if (pos.y < minY - 2.0f)
+				{
+					logMoveFail("below terrain (y=%g, terrain=%g)", pos.y, terrainHeight);
+					return false;
+				}
+				// Near surface + slow → landed (scripts / leaveStation)
+				float const above = pos.y - terrainHeight;
+				if (above <= 4.0f && speed <= 2.0f)
+					m_isLanded = true;
+				else if (speed > 2.0f || above > 8.0f)
+					m_isLanded = false;
+			}
+		}
+
+		// Static / physical obstacle test (rocks, buildings, large props)
+		if (CollisionWorld::getDatabase())
+		{
+			float radius = 3.0f;
+			if (owner->getCollisionSphereExtent_w().getRadius() > 0.5f)
+				radius = owner->getCollisionSphereExtent_w().getRadius() * 0.85f;
+			// Degenerate capsule = sphere at ship position
+			Capsule const shipCapsule(pos, pos, radius);
+			ColliderList collidedWith;
+			CollisionWorld::getDatabase()->queryFor(
+				static_cast<int>(SpatialDatabase::Q_Physicals),
+				CellProperty::getWorldCellProperty(),
+				true,
+				shipCapsule,
+				collidedWith);
+			for (ColliderList::const_iterator i = collidedWith.begin(); i != collidedWith.end(); ++i)
+			{
+				Object const * const collider = &(NON_NULL(*i)->getOwner());
+				if (!collider || collider == owner)
+					continue;
+				// Allow other ships to pass (handled elsewhere); block statics / creatures / structures
+				ShipObject const * const otherShip = collider->asServerObject()
+					? collider->asServerObject()->asShipObject()
+					: 0;
+				if (otherShip)
+					continue;
+				logMoveFail("obstacle collision with %s", collider->getNetworkId().getValueString().c_str());
+				return false;
+			}
+		}
+	}
+	else if (speed > 2.0f)
+		m_isLanded = false;
 
 	UNREF(velocity);
 	m_lastVerifiedTransform = transform;

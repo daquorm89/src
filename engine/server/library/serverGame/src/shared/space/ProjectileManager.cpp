@@ -9,6 +9,7 @@
 #include "serverGame/FirstServerGame.h"
 #include "serverGame/ProjectileManager.h"
 
+#include "serverGame/ConfigServerGame.h"
 #include "serverGame/ConnectionServerConnection.h"
 #include "serverGame/PlayerShipController.h"
 #include "serverGame/ShipObject.h"
@@ -28,6 +29,7 @@
 #include "sharedObject/Appearance.h"
 #include "sharedObject/AppearanceTemplate.h"
 #include "sharedObject/CellProperty.h"
+#include "sharedTerrain/TerrainObject.h"
 
 // ======================================================================
 
@@ -193,6 +195,29 @@ namespace ProjectileManagerNamespace
 					trigger(*so, collisionPosition_o);
 				
 				return false;
+			}
+
+			// P9 atmospheric: projectiles (blasters) hit terrain instead of
+			// passing through. Sample along the path this frame.
+			if (ConfigServerGame::getAllowAtmosphericFlight())
+			{
+				TerrainObject const * const terrain = TerrainObject::getConstInstance();
+				if (terrain)
+				{
+					Vector const end_w = projectilePosition_w + projectilePath;
+					int const samples = 4;
+					for (int s = 0; s <= samples; ++s)
+					{
+						float const u = static_cast<float>(s) / static_cast<float>(samples);
+						Vector const sample = Vector::linearInterpolate(projectilePosition_w, end_w, u);
+						float terrainHeight = 0.f;
+						if (terrain->getHeight(sample, terrainHeight) && sample.y < terrainHeight + 0.5f)
+						{
+							// Hit terrain — end the projectile (visual may already be past)
+							return false;
+						}
+					}
+				}
 			}
 			
 			if (!isBeam)

@@ -25,6 +25,7 @@
 #include "sharedNetworkMessages/MessageQueueNetworkId.h"
 #include "sharedNetworkMessages/ShipUpdateTransformMessage.h"
 #include "sharedObject/NetworkIdManager.h"
+#include "sharedTerrain/TerrainObject.h"
 
 #include <set>
 
@@ -64,6 +65,7 @@ ShipController::ShipController(ShipObject * newOwner) :
 	m_attackTargetDecayTimer(new Timer(static_cast<float>(s_maxTargetAge))),
 	m_enemyCheckQueued(false),
 	m_turretTargetingSystem(nullptr),
+	m_isLanded(false),
 	m_dockedByList(new DockedByList),
 	m_aiTargetingMeList(new CachedNetworkIdList)
 {
@@ -187,6 +189,190 @@ void ShipController::respondToCollision(Vector const & deltaToMove_p, Vector con
 	owner->setTransform_o2p(transform_p);
 
 	experiencedCollision();
+}
+
+// ----------------------------------------------------------------------
+
+// ----------------------------------------------------------------------
+//
+// P9 atmospheric flight.
+//
+// checkLanding() decides whether contact with the ground at this moment
+// counts as a landing rather than a collision. It samples terrain height
+// at several points around the hull footprint (not just the single
+// impact point from the capsule sweep) so a slow approach onto uneven or
+// sloped ground is correctly rejected as "not a safe landing spot" and
+// falls through to the normal collision response instead.
+//
+// Only ever returns true on a ground scene: TerrainObject::getConstInstance()
+// is null in space, so this is a safe no-op there even if ever called.
+//
+// ----------------------------------------------------------------------
+
+bool ShipController::checkLanding(Vector const & normalOfSurface_p) const
+{
+	TerrainObject const * const terrain = TerrainObject::getConstInstance();
+	if (!terrain)
+		return false;
+
+	// too fast (in any direction) to be a landing -- treat as a collision.
+	float const speed = m_shipDynamicsModel->getVelocity().magnitude();
+	if (speed > ConfigServerGame::getAtmosphericLandingSpeedThreshold())
+		return false;
+
+	// contacted a steep surface -- not level enough to set down on.
+	if (normalOfSurface_p.dot(Vector::unitY) < 0.85f) // ~roughly within 30 degrees of vertical
+		return false;
+
+	ShipObject const * const owner = getShipOwner();
+	if (!owner)
+		return false;
+
+	Transform const & transform_w = owner->getTransform_o2w();
+	Vector const center_w = transform_w.getPosition_p();
+	Vector const forward_w = transform_w.getLocalFrameK_p();
+	Vector const right_w = transform_w.getLocalFrameI_p();
+
+	float radius = owner->getCollisionSphereExtent_w().getRadius();
+	if (radius <= 0.0f)
+		radius = 5.0f; // sane fallback if a ship template has no collision extent set up
+
+	Vector const samplePoints[5] =
+	{
+		center_w,
+		center_w + forward_w * radius,
+		center_w - forward_w * radius,
+		center_w + right_w * radius,
+		center_w - right_w * radius
+	};
+
+	float minHeight = 0.0f;
+	float maxHeight = 0.0f;
+	bool first = true;
+
+	for (int i = 0; i < 5; ++i)
+	{
+		float sampleHeight = 0.0f;
+		if (!terrain->getHeight(samplePoints[i], sampleHeight))
+			return false; // couldn't resolve terrain under one of the sample points (e.g. over water/void) -- don't land
+
+		if (first)
+		{
+			minHeight = maxHeight = sampleHeight;
+			first = false;
+		}
+		else
+		{
+			minHeight = std::min(minHeight, sampleHeight);
+			maxHeight = std::max(maxHeight, sampleHeight);
+		}
+	}
+
+	// too much height variance under the hull -- not flat enough to land on.
+	if ((maxHeight - minHeight) > ConfigServerGame::getAtmosphericLandingSlopeTolerance())
+		return false;
+
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
+void ShipController::respondToTerrainCollision(Vector const & deltaToMove_p, Vector const & newReflection_p, Vector const & normalOfSurface_p)
+{
+	ShipObject * const owner = getShipOwner();
+	NOT_NULL(owner);
+
+	float const impactSpeed = m_shipDynamicsModel->getVelocity().magnitude();
+
+	if (checkLanding(normalOfSurface_p))
+	{
+		// settle onto the ground: move to the contact point, kill velocity,
+		// mark landed. No damage -- this is a controlled touchdown, not a crash.
+		Transform transform_p(m_shipDynamicsModel->getTransform());
+		transform_p.move_p(deltaToMove_p);
+
+		m_shipDynamicsModel->setTransform(transform_p);
+		m_shipDynamicsModel->setVelocity(Vector::zero);
+		m_throttlePosition = 0.0f;
+
+		owner->setTransform_o2p(transform_p);
+
+		m_isLanded = true;
+
+		experiencedCollision();
+		return;
+	}
+
+	// not a clean landing -- fall through to a normal bounce, same math as
+	// ship-vs-ship collision (respondToCollision), but kept as a separate
+	// function so that path is never touched by atmospheric flight changes.
+	Transform transform_p(m_shipDynamicsModel->getTransform());
+	transform_p.move_p(deltaToMove_p);
+
+	m_shipDynamicsModel->setTransform(transform_p);
+	m_shipDynamicsModel->setVelocity(newReflection_p * impactSpeed);
+
+	owner->setTransform_o2p(transform_p);
+
+	// only a hard impact actually damages the hull -- a failed, slow landing
+	// attempt (e.g. too steep a slope) just bounces/stops with no damage.
+	float const damageThreshold = ConfigServerGame::getAtmosphericCollisionDamageSpeedThreshold();
+	if (impactSpeed > damageThreshold)
+	{
+		float const damage = (impactSpeed - damageThreshold) * ConfigServerGame::getAtmosphericCollisionDamageScale();
+		float const newChassisHitPoints = std::max(0.0f, owner->getCurrentChassisHitPoints() - damage);
+		owner->setCurrentChassisHitPoints(newChassisHitPoints);
+	}
+
+	experiencedCollision();
+}
+
+// ----------------------------------------------------------------------
+
+bool ShipController::isLanded() const
+{
+	return m_isLanded;
+}
+
+// ----------------------------------------------------------------------
+
+void ShipController::setLanded(bool landed)
+{
+	m_isLanded = landed;
+	if (!landed)
+		return;
+
+	// P9: when scripts (or landing code) mark a ship landed, force a settled
+	// state and snap to terrain. Player ships often never hit
+	// respondToTerrainCollision() (client-authoritative), so JNI setShipLanded
+	// is the only reliable path after Call Ship / unpack on a ground planet.
+	m_throttlePosition = 0.0f;
+	if (m_shipDynamicsModel)
+		m_shipDynamicsModel->setVelocity(Vector::zero);
+
+	ShipObject * const owner = getShipOwner();
+	if (!owner || !ConfigServerGame::getAllowAtmosphericFlight())
+		return;
+
+	TerrainObject const * const terrain = TerrainObject::getConstInstance();
+	if (!terrain || !m_shipDynamicsModel)
+		return;
+
+	Transform transform_p(m_shipDynamicsModel->getTransform());
+	Vector pos = transform_p.getPosition_p();
+	float terrainHeight = 0.0f;
+	if (!terrain->getHeight(pos, terrainHeight))
+		return;
+
+	// Rest slightly above the surface so the hull is not buried
+	float const clearance = 1.25f;
+	if (pos.y < terrainHeight + clearance + 0.01f || pos.y > terrainHeight + clearance + 5.0f)
+	{
+		pos.y = terrainHeight + clearance;
+		transform_p.setPosition_p(pos);
+		m_shipDynamicsModel->setTransform(transform_p);
+		owner->setTransform_o2p(transform_p);
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -610,6 +796,12 @@ bool ShipController::face(Vector const & goalPosition_w, Vector const & up_w, fl
 void ShipController::setThrottle(float throttle)
 {
 	m_throttlePosition = clamp(0.0f,throttle,1.0f);
+
+	// P9 atmospheric flight: applying throttle after a landing is a
+	// takeoff -- clear the landed flag so terrain contact is evaluated
+	// (and can trigger a new landing or a collision) again.
+	if (m_isLanded && (m_throttlePosition > 0.01f))
+		m_isLanded = false;
 }
 
 // ----------------------------------------------------------------------

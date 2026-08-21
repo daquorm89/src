@@ -10,6 +10,7 @@
 #include "serverGame/FirstServerGame.h"
 #include "serverGame/CollisionCallbacks.h"
 
+#include "serverGame/ConfigServerGame.h"
 #include "serverGame/ShipController.h"
 #include "serverGame/ShipObject.h"
 #include "sharedFoundation/CrcLowerString.h"
@@ -72,7 +73,16 @@ void CollisionCallbacks::install()
 	CollisionCallbackManager::registerOnHitFunction(CollisionCallbacksNamespace::onHitDoCollisionWith, miningAsteroidDynamic, asteroid);
 	CollisionCallbackManager::registerOnHitFunction(CollisionCallbacksNamespace::onHitDoCollisionWith, miningAsteroidDynamic, shipStation);
 
-	//CollisionCallbackManager::registerDoCollisionWithTerrainFunction(CollisionCallbacksNamespace::onDoCollisionWithTerrain);
+	// P9 atmospheric flight: ship-vs-terrain collision was left disabled
+	// (the registration below was commented out) with no "landing" concept
+	// on top of it -- see ShipController::checkLanding()/
+	// respondToTerrainCollision() for the landing/damage logic layered on
+	// top of this. Gated behind the live kill switch so the whole feature
+	// (including this collision path) can be turned off without a rebuild.
+	if (ConfigServerGame::getAllowAtmosphericFlight())
+	{
+		CollisionCallbackManager::registerDoCollisionWithTerrainFunction(CollisionCallbacksNamespace::onDoCollisionWithTerrain);
+	}
 
 	ExitChain::add(CollisionCallbacksNamespace::remove, "CollisionCallbacks");
 }
@@ -134,7 +144,11 @@ bool CollisionCallbacksNamespace::onDoCollisionWithTerrain(Object * const object
 		ShipController * const shipController = safe_cast<ShipController *>(shipObject->getController());
 		NOT_NULL(shipController);
 
-		shipController->respondToCollision(result.m_deltaToMoveBack_p, result.m_newReflection_p, result.m_normalOfSurface_p);
+		// P9 atmospheric flight: terrain contact goes through
+		// respondToTerrainCollision(), not respondToCollision() -- it can
+		// resolve into a landing instead of always bouncing. Ship-vs-ship
+		// collision (onHitDoCollisionWith above) is untouched.
+		shipController->respondToTerrainCollision(result.m_deltaToMoveBack_p, result.m_newReflection_p, result.m_normalOfSurface_p);
 		return true;
 	}
 	return false;

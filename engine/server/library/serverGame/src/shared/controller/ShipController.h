@@ -57,6 +57,16 @@ public:
 
 	void respondToCollision(Vector const & deltaToMove_p, Vector const & newReflection_p, Vector const & normalOfSurface_p);
 
+	// P9 atmospheric flight: terrain contact takes a separate path from
+	// ship-vs-ship/asteroid collision (respondToCollision above) so that a
+	// gentle, level touchdown can settle into a landed state instead of
+	// always bouncing, while a hard/steep impact still collides normally.
+	void respondToTerrainCollision(Vector const & deltaToMove_p, Vector const & newReflection_p, Vector const & normalOfSurface_p);
+	bool isLanded() const;
+	// Explicitly mark landed/not-landed (e.g. after unpackShip on ground
+	// places a ship at rest without a collision event ever firing).
+	void setLanded(bool landed);
+
 	ShipObject * getShipOwner();
 	ShipObject const * getShipOwner() const;
 
@@ -101,6 +111,13 @@ public:
 
 protected:
 
+	// P9 atmospheric flight: multi-point terrain sample under the hull to
+	// decide whether contact counts as a landing (flat/level enough, and
+	// slow enough) rather than a collision. Only meaningful when a
+	// TerrainObject exists (i.e. a ground scene) -- always returns false
+	// in space.
+	bool checkLanding(Vector const & normalOfSurface_p) const;
+
 	virtual float realAlter(float elapsedTime);
 	virtual void handleMessage (int message, float value, const MessageQueue::Data* data, uint32 flags);
 
@@ -115,6 +132,11 @@ protected:
 	Timer * const m_attackTargetDecayTimer;
 	bool m_enemyCheckQueued;
 	ShipTurretTargetingSystem * m_turretTargetingSystem;
+
+	// P9 atmospheric flight: true once this ship has settled onto the
+	// ground via respondToTerrainCollision(). Cleared the moment throttle
+	// is applied again (see setThrottle()).
+	bool m_isLanded;
 
 private:
 
