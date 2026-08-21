@@ -205,13 +205,13 @@ namespace ProjectileManagerNamespace
 				if (terrain)
 				{
 					Vector const end_w = projectilePosition_w + projectilePath;
-					int const samples = 4;
+					int const samples = 12;
 					for (int s = 0; s <= samples; ++s)
 					{
 						float const u = static_cast<float>(s) / static_cast<float>(samples);
 						Vector const sample = Vector::linearInterpolate(projectilePosition_w, end_w, u);
 						float terrainHeight = 0.f;
-						if (terrain->getHeight(sample, terrainHeight) && sample.y < terrainHeight + 0.5f)
+						if (terrain->getHeight(sample, terrainHeight) && sample.y < terrainHeight + 2.0f)
 						{
 							// Hit terrain — end the projectile (visual may already be past)
 							return false;

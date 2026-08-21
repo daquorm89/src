@@ -835,14 +835,17 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 			}
 		}
 
-		// Static / physical obstacle test (rocks, buildings, large props)
+		// Static / physical obstacle test (rocks, buildings, large props).
+		// Sweep a capsule from last verified position to the proposed position
+		// so fast client moves cannot tunnel through thin colliders.
 		if (CollisionWorld::getDatabase())
 		{
-			float radius = 3.0f;
-			if (owner->getCollisionSphereExtent_w().getRadius() > 0.5f)
-				radius = owner->getCollisionSphereExtent_w().getRadius() * 0.85f;
-			// Degenerate capsule = sphere at ship position
-			Capsule const shipCapsule(pos, pos, radius);
+			float radius = 4.0f;
+			float const extentR = owner->getCollisionSphereExtent_w().getRadius();
+			if (extentR > 0.5f)
+				radius = std::max(4.0f, extentR * 0.9f);
+			Vector const prev = m_lastVerifiedTransform.getPosition_p();
+			Capsule const shipCapsule(prev, pos, radius);
 			ColliderList collidedWith;
 			CollisionWorld::getDatabase()->queryFor(
 				static_cast<int>(SpatialDatabase::Q_Physicals),
@@ -855,11 +858,13 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 				Object const * const collider = &(NON_NULL(*i)->getOwner());
 				if (!collider || collider == owner)
 					continue;
-				// Allow other ships to pass (handled elsewhere); block statics / creatures / structures
 				ShipObject const * const otherShip = collider->asServerObject()
 					? collider->asServerObject()->asShipObject()
 					: 0;
 				if (otherShip)
+					continue;
+				// Skip the pilot / passengers if they appear in the query
+				if (collider->asServerObject() && collider->asServerObject()->asCreatureObject())
 					continue;
 				logMoveFail("obstacle collision with %s", collider->getNetworkId().getValueString().c_str());
 				return false;
