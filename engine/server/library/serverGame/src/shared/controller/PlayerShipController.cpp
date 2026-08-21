@@ -36,6 +36,11 @@
 #include "sharedObject/AlterResult.h"
 #include "sharedObject/NetworkIdManager.h"
 #include "sharedTerrain/TerrainObject.h"
+#include "sharedCollision/CollisionWorld.h"
+#include "sharedCollision/CollisionProperty.h"
+#include "sharedCollision/SpatialDatabase.h"
+#include "sharedMath/Capsule.h"
+#include "sharedObject/CellProperty.h"
 
 #include <limits>
 #include <map>
@@ -804,12 +809,13 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 	// P9 atmospheric flight: player ships are client-authoritative, so the
 	// CollisionWorld terrain callback often never runs for them. Enforce a
 	// floor here. Prefer clamp-in-receiveTransform; reject only if still deep.
+	// Also reject moves that embed the ship in static obstacles (rocks, buildings).
 	if (ConfigServerGame::getAllowAtmosphericFlight())
 	{
+		Vector const pos = transform.getPosition_p();
 		TerrainObject const * const terrain = TerrainObject::getConstInstance();
 		if (terrain)
 		{
-			Vector const pos = transform.getPosition_p();
 			float terrainHeight = 0.f;
 			if (terrain->getHeight(pos, terrainHeight))
 			{
@@ -826,6 +832,37 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 					m_isLanded = true;
 				else if (speed > 2.0f || above > 8.0f)
 					m_isLanded = false;
+			}
+		}
+
+		// Static / physical obstacle test (rocks, buildings, large props)
+		if (CollisionWorld::getDatabase())
+		{
+			float radius = 3.0f;
+			if (owner->getCollisionSphereExtent_w().getRadius() > 0.5f)
+				radius = owner->getCollisionSphereExtent_w().getRadius() * 0.85f;
+			// Degenerate capsule = sphere at ship position
+			Capsule const shipCapsule(pos, pos, radius);
+			ColliderList collidedWith;
+			CollisionWorld::getDatabase()->queryFor(
+				static_cast<int>(SpatialDatabase::Q_Physicals),
+				CellProperty::getWorldCellProperty(),
+				true,
+				shipCapsule,
+				collidedWith);
+			for (ColliderList::const_iterator i = collidedWith.begin(); i != collidedWith.end(); ++i)
+			{
+				Object const * const collider = &(NON_NULL(*i)->getOwner());
+				if (!collider || collider == owner)
+					continue;
+				// Allow other ships to pass (handled elsewhere); block statics / creatures / structures
+				ShipObject const * const otherShip = collider->asServerObject()
+					? collider->asServerObject()->asShipObject()
+					: 0;
+				if (otherShip)
+					continue;
+				logMoveFail("obstacle collision with %s", collider->getNetworkId().getValueString().c_str());
+				return false;
 			}
 		}
 	}

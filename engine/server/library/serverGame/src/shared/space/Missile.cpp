@@ -6,6 +6,7 @@
 // ======================================================================
 
 #include "serverGame/FirstServerGame.h"
+#include "serverGame/ConfigServerGame.h"
 #include "serverGame/Missile.h"
 
 #include "UnicodeUtils.h"
@@ -21,6 +22,7 @@
 #include "serverUtility/ServerClock.h"
 #include "sharedCollision/CollisionProperty.h"
 #include "sharedCollision/CollisionWorld.h"
+#include "sharedTerrain/TerrainObject.h"
 #include "sharedCollision/Extent.h"
 #include "sharedCollision/SpatialDatabase.h"
 #include "sharedMath/MultiShape.h"
@@ -125,6 +127,36 @@ bool Missile::fire()
 				Object const * const collider = &(NON_NULL(*i)->getOwner());
 				if (collider != sourceServerObject && collider != targetServerObject)
 					destroy();
+			}
+		}
+
+		// P9 atmospheric: missiles that fly into terrain detonate / miss
+		if (ConfigServerGame::getAllowAtmosphericFlight() && m_state == MS_Launched)
+		{
+			TerrainObject const * const terrain = TerrainObject::getConstInstance();
+			if (terrain)
+			{
+				int const samples = 16;
+				for (int s = 1; s <= samples; ++s)
+				{
+					float const u = static_cast<float>(s) / static_cast<float>(samples);
+					Vector const sample = Vector::linearInterpolate(sourceLocation, targetLocation, u);
+					float terrainHeight = 0.f;
+					if (terrain->getHeight(sample, terrainHeight) && sample.y < terrainHeight + 1.0f)
+					{
+						// Impact terrain before target — treat as miss / destroy
+						m_state = MS_Miss;
+						float const hitFraction = u;
+						float const speed = MissileManager::getInstance().getSpeedByMissileType(m_missileType);
+						float const dist = (sourceLocation - targetLocation).magnitude() * hitFraction;
+						float hitTime = (speed > 0.f) ? (dist / speed) : 0.f;
+						hitTime = std::max(hitTime, 0.1f);
+						// Schedule early end
+						m_fireTime = ServerClock::getInstance().getGameTimeSeconds();
+						m_impactTime = m_fireTime + static_cast<uint32>(hitTime);
+						break;
+					}
+				}
 			}
 		}
 				
