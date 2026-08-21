@@ -806,10 +806,10 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 		}
 	}
 
-	// P9 atmospheric flight: player ships are client-authoritative, so the
-	// CollisionWorld terrain callback often never runs for them. Enforce a
-	// floor here. Prefer clamp-in-receiveTransform; reject only if still deep.
-	// Also reject moves that embed the ship in static obstacles (rocks, buildings).
+	// P9 atmospheric flight: player ships are client-authoritative.
+	// Server only tracks landed state from height/speed. Obstacle and fine
+	// terrain collision are handled client-side (do not reject moves here —
+	// false rejects from CollisionWorld queries ruined flight).
 	if (ConfigServerGame::getAllowAtmosphericFlight())
 	{
 		Vector const pos = transform.getPosition_p();
@@ -819,55 +819,11 @@ bool PlayerShipController::checkValidMove(Transform const &transform, Vector con
 			float terrainHeight = 0.f;
 			if (terrain->getHeight(pos, terrainHeight))
 			{
-				float const minY = terrainHeight + 0.5f;
-				// Deep penetration: reject (teleport to last verified)
-				if (pos.y < minY - 2.0f)
-				{
-					logMoveFail("below terrain (y=%g, terrain=%g)", pos.y, terrainHeight);
-					return false;
-				}
-				// Near surface + slow → landed (scripts / leaveStation)
 				float const above = pos.y - terrainHeight;
 				if (above <= 4.0f && speed <= 2.0f)
 					m_isLanded = true;
 				else if (speed > 2.0f || above > 8.0f)
 					m_isLanded = false;
-			}
-		}
-
-		// Static / physical obstacle test (rocks, buildings, large props).
-		// Sweep a capsule from last verified position to the proposed position
-		// so fast client moves cannot tunnel through thin colliders.
-		if (CollisionWorld::getDatabase())
-		{
-			float radius = 4.0f;
-			float const extentR = owner->getCollisionSphereExtent_w().getRadius();
-			if (extentR > 0.5f)
-				radius = std::max(4.0f, extentR * 0.9f);
-			Vector const prev = m_lastVerifiedTransform.getPosition_p();
-			Capsule const shipCapsule(prev, pos, radius);
-			ColliderList collidedWith;
-			CollisionWorld::getDatabase()->queryFor(
-				static_cast<int>(SpatialDatabase::Q_Physicals),
-				CellProperty::getWorldCellProperty(),
-				true,
-				shipCapsule,
-				collidedWith);
-			for (ColliderList::const_iterator i = collidedWith.begin(); i != collidedWith.end(); ++i)
-			{
-				Object const * const collider = &(NON_NULL(*i)->getOwner());
-				if (!collider || collider == owner)
-					continue;
-				ShipObject const * const otherShip = collider->asServerObject()
-					? collider->asServerObject()->asShipObject()
-					: 0;
-				if (otherShip)
-					continue;
-				// Skip the pilot / passengers if they appear in the query
-				if (collider->asServerObject() && collider->asServerObject()->asCreatureObject())
-					continue;
-				logMoveFail("obstacle collision with %s", collider->getNetworkId().getValueString().c_str());
-				return false;
 			}
 		}
 	}
