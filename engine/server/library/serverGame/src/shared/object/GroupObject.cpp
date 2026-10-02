@@ -55,7 +55,7 @@ namespace GroupObjectNamespace
 {
 	// ----------------------------------------------------------------------
 
-	unsigned int const cs_maximumNumberInGroup = 8;
+	unsigned int const cs_maximumNumberInGroup = 30;
 	char const * const DEFAULT_GROUP_TEMPLATE = "object/group/group.iff";
 	std::map<NetworkId, NetworkId> s_leaderMap;
 	static const std::string cs_emptyString;
