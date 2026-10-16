@@ -7785,6 +7785,11 @@ void CreatureObject::doWarmupChecks(Command const &command, NetworkId const &tar
 {
 	if (doesLocomotionInvalidateCommand(command))
 	{
+		// Report the locomotion used for the permission check (RidingCreature
+		// while mounted), not raw getLocomotion() which can still be Standing.
+		Locomotions::Enumerator failLoco = getLocomotion();
+		if (getState(States::RidingMount))
+			failLoco = Locomotions::RidingCreature;
 		if (ConfigServerGame::getLogAllCommands())
 		{
 			LOG(
@@ -7793,10 +7798,10 @@ void CreatureObject::doWarmupChecks(Command const &command, NetworkId const &tar
 					getNetworkId().getValueString().c_str(),
 					targetId.getValueString().c_str(),
 					command.m_commandName.c_str(),
-					getLocomotion()));
+					static_cast<int>(failLoco)));
 		}
 		status = Command::CEC_Locomotion;
-		statusDetail = static_cast<int>(getLocomotion());
+		statusDetail = static_cast<int>(failLoco);
 	}
 	else if (isPlayerControlled() && command.m_characterAbility.size() && !hasCommand(command.m_characterAbility))
 	{
