@@ -318,14 +318,19 @@ int TangibleObject::getPobBaseItemLimit() const
 		limitBasedOnLots = numberOfLots * ConfigServerGame::getHouseItemLimitMultiplier();
 	}
 
+	// Houses are capped by maxHouseItemLimit (default 500). Player-owned ships
+	// (YT-1300, Decimator, etc.) use structure.capacity_override for a much
+	// higher limit and must not be clamped by the house config.
 	const int limitBasedOnConfig = ConfigServerGame::getMaxHouseItemLimit();
-	const int baseItemLimit = std::min(limitBasedOnLots,limitBasedOnConfig);
+	const bool isShip = (asShipObject() != nullptr);
+	const int baseItemLimit = isShip ? limitBasedOnLots : std::min(limitBasedOnLots, limitBasedOnConfig);
 
-	DEBUG_REPORT_LOG(true,("*** \nnetworkId[%s]\ngetNumberOfLots()=%d\nlimitBasedOnLots=%d\nlimitBasedOnConfig=%d\nbaseItemLimit=%d\n\n\n",
+	DEBUG_REPORT_LOG(true,("*** \nnetworkId[%s]\ngetNumberOfLots()=%d\nlimitBasedOnLots=%d\nlimitBasedOnConfig=%d\nisShip=%d\nbaseItemLimit=%d\n\n\n",
 		getNetworkId().getValueString().c_str(),
 		getNumberOfLots(),
 		limitBasedOnLots,
 		limitBasedOnConfig,
+		isShip ? 1 : 0,
 		baseItemLimit
 	));
 
