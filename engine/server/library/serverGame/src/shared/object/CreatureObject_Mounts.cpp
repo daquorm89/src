@@ -386,15 +386,15 @@ void CreatureObject::alterAuthoritativeForMounts()
 {
 	DEBUG_FATAL(!isAuthoritative(), ("This should only be called from CreatureObject::alter() when isAuthoratative() is true."));
 
-	//-- Handle rider or mount incapacitation case.
-	// RidingCreature / DrivingVehicle are valid mounted postures (client may
-	// report them via setLocomotion after movement_human maps riding locos).
-	// Only force-dismount for incap / death / knockdown / non-mounted poses.
+	//-- Force-dismount only for incap / death / knockdown.
+	// Any other posture (including RidingCreature, Sitting, etc.) must NOT
+	// tear down a successful mount. Prior logic treated every non-Upright
+	// posture as incap and immediately detached the rider.
 	Postures::Enumerator const currentPosture = getPosture();
 	bool const shouldBeDismounted =
-		(currentPosture != Postures::Upright) &&
-		(currentPosture != Postures::RidingCreature) &&
-		(currentPosture != Postures::DrivingVehicle);
+		(currentPosture == Postures::Incapacitated) ||
+		(currentPosture == Postures::Dead) ||
+		(currentPosture == Postures::KnockedDown);
 
 	if (shouldBeDismounted)
 	{
