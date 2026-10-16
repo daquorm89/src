@@ -187,6 +187,7 @@ namespace ScriptMethodsShipNamespace
 	jfloat       JNICALL getChassisComponentMassMaximum                (JNIEnv * env, jobject self, jlong shipId);
 	jboolean     JNICALL setChassisComponentMassMaximum                (JNIEnv * env, jobject self, jlong shipId, jfloat chassisComponentMassMaximum);
 	jboolean     JNICALL isShipSlotInstalled                           (JNIEnv * env, jobject self, jlong shipId, jint chassisSlot);
+	void         JNICALL fireShipTurretServer                          (JNIEnv * env, jobject self, jlong shipId, jint weaponIndex, jlong targetId, jint targetedComponent, jboolean goodShot);
 	jboolean     JNICALL isShipComponentDisabled                       (JNIEnv * env, jobject self, jlong shipId, jint chassisSlot);
 	jboolean     JNICALL isShipComponentLowPower                       (JNIEnv * env, jobject self, jlong shipId, jint chassisSlot);
 	jboolean     JNICALL isShipComponentDisabledNeedsPower             (JNIEnv * env, jobject self, jlong shipId, jint chassisSlot);
@@ -442,6 +443,7 @@ const JNINativeMethod NATIVES[] = {
 	JF("_getChassisComponentMassMaximum",               "(J)F",     getChassisComponentMassMaximum),
 	JF("_setChassisComponentMassMaximum",               "(JF)Z",    setChassisComponentMassMaximum),
 	JF("_isShipSlotInstalled",                          "(JI)Z",     isShipSlotInstalled),
+	JF("_fireShipTurretServer",                         "(JIJIZ)V",  fireShipTurretServer),
 	JF("_isShipComponentDisabled",                      "(JI)Z",     isShipComponentDisabled),
 	JF("_isShipComponentLowPower",                      "(JI)Z",     isShipComponentLowPower),
 	JF("_isShipComponentDisabledNeedsPower",            "(JI)Z",     isShipComponentDisabledNeedsPower),
@@ -4210,4 +4212,25 @@ void JNICALL ScriptMethodsShipNamespace::openSpaceMiningUi(JNIEnv * env, jobject
 }
 
 // ======================================================================
+
+// ----------------------------------------------------------------------
+
+void JNICALL ScriptMethodsShipNamespace::fireShipTurretServer(JNIEnv * env, jobject /*self*/, jlong jobject_shipId, jint weaponIndex, jlong jobject_targetId, jint targetedComponent, jboolean goodShot)
+{
+	ShipObject * const shipObject = JavaLibrary::getShipThrow(env, jobject_shipId, "JavaLibrary::fireShipTurretServer ship obj_id did not resolve to a ShipObject", false);
+	if (!shipObject)
+		return;
+
+	NetworkId const targetId(jobject_targetId);
+	if (targetId == NetworkId::cms_invalid)
+		return;
+
+	// weaponIndex is the chassis weapon slot index (0-based within SCST_weapon_*)
+	shipObject->fireShotTurretServer(
+		weaponIndex,
+		targetId,
+		static_cast<ShipChassisSlotType::Type>(targetedComponent),
+		goodShot == JNI_TRUE,
+		true /* fromAutoTurret */);
+}
 
