@@ -14307,20 +14307,28 @@ void CreatureObject::setLastWaterDamageTime(unsigned long newTime)
 
 bool CreatureObject::doesLocomotionInvalidateCommand(Command const &cmd) const
 {
-	Locomotions::Enumerator locomotion = getLocomotion();
-	// Mounted rider: force RidingCreature for the permission check. While the
-	// mount moves, getLocomotion() can resolve to Standing/Invalid because
-	// movement_human slow/fast cells for RidingCreature were empty.
-	if (getState(States::RidingMount))
-		locomotion = Locomotions::RidingCreature;
+	Locomotions::Enumerator const locomotion = getLocomotion();
+
+	// Original rule: the command is refused when the current locomotion is not permitted.
+	bool invalid;
 	if((locomotion != Locomotions::Running) || cmd.m_locomotionPermissions[locomotion])
-		return !cmd.m_locomotionPermissions[locomotion];
-	if(!isPlayerControlled())
-		return true;
-	PlayerCreatureController const *playerCreatureController = safe_cast<PlayerCreatureController const *>(getController());
-	if(playerCreatureController)
-		return (playerCreatureController->getLastSpeed() > ConfigSharedGame::getMovementThresholdForActionValidation());
-	return true;
+		invalid = !cmd.m_locomotionPermissions[locomotion];
+	else if(!isPlayerControlled())
+		invalid = true;
+	else
+	{
+		PlayerCreatureController const *playerCreatureController = safe_cast<PlayerCreatureController const *>(getController());
+		invalid = playerCreatureController ? (playerCreatureController->getLastSpeed() > ConfigSharedGame::getMovementThresholdForActionValidation()) : true;
+	}
+
+	// Mounted rider: ALSO accept the command if it explicitly allows RidingCreature.
+	// This is a union, not a replacement: commands that worked mounted before keep
+	// working, and commands flagged L:ridingCreature=1 work even while the mount
+	// moves and getLocomotion() is not RidingCreature.
+	if (invalid && getState(States::RidingMount) && cmd.m_locomotionPermissions[Locomotions::RidingCreature])
+		invalid = false;
+
+	return invalid;
 }
 
 // ----------------------------------------------------------------------
