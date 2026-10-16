@@ -4225,11 +4225,41 @@ void JNICALL ScriptMethodsShipNamespace::fireShipTurretServer(JNIEnv * env, jobj
 	if (targetId == NetworkId::cms_invalid)
 		return;
 
+	// Only real, installed turrets may be fired from script. fireShotTurretServer only
+	// asserts this in debug builds; without the check missiles, countermeasures and
+	// fixed pilot guns would be fired from a meaningless transform.
+	if (weaponIndex < 0 || weaponIndex >= ShipChassisSlotType::cms_numWeaponIndices)
+		return;
+
+	ShipChassisSlotType::Type const weaponSlot = static_cast<ShipChassisSlotType::Type>(static_cast<int>(ShipChassisSlotType::SCST_weapon_first) + weaponIndex);
+	if (!shipObject->isSlotInstalled(weaponSlot) || !shipObject->isTurret(weaponIndex))
+		return;
+
+	Object * const targetObject = NetworkIdManager::getObjectById(targetId);
+	if (!targetObject)
+		return;
+
+	// Same gates as ShipTurretTargetingSystem::alter: range and firing arc.
+	Transform const turretTransform = shipObject->getTurretTransform(weaponIndex);
+	float const weaponRange = shipObject->getWeaponRange(weaponIndex);
+	if (targetObject->getPosition_w().magnitudeBetweenSquared(turretTransform.getPosition_p()) > weaponRange * weaponRange)
+		return;
+	if (!shipObject->canTurretFireTowardsLocation_p(weaponIndex, targetObject->getPosition_w()))
+		return;
+
+	// Component to aim at: caller value if it is a valid chassis slot, else the pilot's look-at slot.
+	ShipChassisSlotType::Type component = shipObject->getPilotLookAtTargetSlot();
+	if (targetedComponent >= static_cast<int>(ShipChassisSlotType::SCST_first) && targetedComponent < static_cast<int>(ShipChassisSlotType::SCST_num_types))
+		component = static_cast<ShipChassisSlotType::Type>(targetedComponent);
+
+	// Let the turret mesh track the target (same call the engine turret AI makes).
+	shipObject->setTurretTarget(weaponIndex, CachedNetworkId(targetId));
+
 	// weaponIndex is the chassis weapon slot index (0-based within SCST_weapon_*)
 	shipObject->fireShotTurretServer(
 		weaponIndex,
 		targetId,
-		static_cast<ShipChassisSlotType::Type>(targetedComponent),
+		component,
 		goodShot == JNI_TRUE,
 		true /* fromAutoTurret */);
 }
