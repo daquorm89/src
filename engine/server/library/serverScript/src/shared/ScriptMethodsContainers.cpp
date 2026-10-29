@@ -55,6 +55,7 @@ namespace ScriptMethodsContainersNamespace
 	jint         JNICALL getVolume(JNIEnv *env, jobject self, jlong target);
 	jint         JNICALL getFilledVolume(JNIEnv *env, jobject self, jlong container);
 	jint         JNICALL getTotalVolume(JNIEnv *env, jobject self, jlong container);
+	jboolean     JNICALL setContainerCapacity(JNIEnv *env, jobject self, jlong container, jint capacity);
 	jint         JNICALL canPutIn(JNIEnv *env, jobject self, jlong item, jlong container);
 	jint         JNICALL canPutInSlot(JNIEnv *env, jobject self, jlong item, jlong container, jstring slot);
 	void         JNICALL sendContainerErrorToClient(JNIEnv *env, jobject self, jlong player, jint errorCode);
@@ -112,6 +113,7 @@ const JNINativeMethod NATIVES[] = {
 	JF("_getVolumeFree", "(J)I",getVolumeFree),
 	JF("_getFilledVolume", "(J)I",getFilledVolume),
 	JF("_getTotalVolume", "(J)I",getTotalVolume),
+	JF("_setContainerCapacity", "(JI)Z",setContainerCapacity),
 	JF("_isInSecureTrade", "(J)Z",isInSecureTrade),
 	JF("_fixLoadWith","(JJI)V", fixLoadWith),
 	JF("_addUserToAccessList", "(JJ)Z", addUserToAccessList),
@@ -667,6 +669,20 @@ jint JNICALL ScriptMethodsContainersNamespace::getTotalVolume(JNIEnv *env, jobje
 	return volContainer->getTotalVolume();
 }
 
+
+//--------------------------------------------------------------------------------------
+
+// P25: set a persistent capacity on a volume container (crafted containers). Stored in objvar
+// container.capacity, re-applied on load and sent to clients. Returns false if the object is not
+// authoritative here or has no limited volume container.
+jboolean JNICALL ScriptMethodsContainersNamespace::setContainerCapacity(JNIEnv *env, jobject self, jlong container, jint capacity)
+{
+	ServerObject * containerOwner = nullptr;
+	if (!JavaLibrary::getObject(container, containerOwner))
+		return JNI_FALSE;
+
+	return containerOwner->setContainerCapacityOverride(static_cast<int>(capacity)) ? JNI_TRUE : JNI_FALSE;
+}
 
 //--------------------------------------------------------------------------------------
 

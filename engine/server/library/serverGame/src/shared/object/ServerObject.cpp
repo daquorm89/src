@@ -2023,6 +2023,8 @@ void ServerObject::endBaselines()
 
 	//Handle updating container info
 	bool addToWorldFlag = handleContentsSetup();
+	// P25: restore a crafted container capacity (contents were already loaded without capacity checks)
+	applyContainerCapacityOverride();
 	setInitialized(true);
 
 	ServerController * c = safe_cast<ServerController*>(getController());
@@ -3540,8 +3542,74 @@ void ServerObject::forwardServerObjectSpecificBaselines() const
 
 //-----------------------------------------------------------------------
 
-void ServerObject::sendObjectSpecificBaselinesToClient(Client const &) const
+namespace ServerObjectContainerCapacityNamespace
 {
+	// P25: crafted container capacity. The objvar is the persisted source of truth.
+	std::string const cs_containerCapacityObjVar("container.capacity");
+	char const * const cs_containerCapacityMessage = "SetContainerCapacityMessage";
+	int const cs_containerCapacityMin = 1;
+	int const cs_containerCapacityMax = 1000;
+}
+
+//-----------------------------------------------------------------------
+
+void ServerObject::sendObjectSpecificBaselinesToClient(Client const & client) const
+{
+	// P25: tell the client about a crafted container capacity, after the object's baselines
+	int capacity = 0;
+	if (getObjVars().getItem(ServerObjectContainerCapacityNamespace::cs_containerCapacityObjVar, capacity) && capacity > 0 && ContainerInterface::getVolumeContainer(*this))
+	{
+		client.send(GenericValueTypeMessage<std::pair<NetworkId, int> >(
+			ServerObjectContainerCapacityNamespace::cs_containerCapacityMessage, std::make_pair(getNetworkId(), capacity)), true);
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void ServerObject::applyContainerCapacityOverride()
+{
+	int capacity = 0;
+	if (!getObjVars().getItem(ServerObjectContainerCapacityNamespace::cs_containerCapacityObjVar, capacity) || capacity <= 0)
+		return;
+
+	VolumeContainer * const volumeContainer = ContainerInterface::getVolumeContainer(*this);
+	if (!volumeContainer || volumeContainer->getTotalVolume() == VolumeContainer::VL_NoVolumeLimit)
+		return;
+
+	IGNORE_RETURN(volumeContainer->debugDoNotUseSetCapacity(capacity));
+}
+
+//-----------------------------------------------------------------------
+
+bool ServerObject::setContainerCapacityOverride(int capacity)
+{
+	if (!isAuthoritative())
+		return false;
+
+	VolumeContainer * const volumeContainer = ContainerInterface::getVolumeContainer(*this);
+	if (!volumeContainer || volumeContainer->getTotalVolume() == VolumeContainer::VL_NoVolumeLimit)
+		return false;
+
+	if (capacity < ServerObjectContainerCapacityNamespace::cs_containerCapacityMin)
+		capacity = ServerObjectContainerCapacityNamespace::cs_containerCapacityMin;
+	if (capacity > ServerObjectContainerCapacityNamespace::cs_containerCapacityMax)
+		capacity = ServerObjectContainerCapacityNamespace::cs_containerCapacityMax;
+
+	IGNORE_RETURN(setObjVarItem(ServerObjectContainerCapacityNamespace::cs_containerCapacityObjVar, capacity));
+	IGNORE_RETURN(volumeContainer->debugDoNotUseSetCapacity(capacity));
+
+	// clients that already have this object get the new capacity now; later observers get it
+	// from sendObjectSpecificBaselinesToClient
+	GenericValueTypeMessage<std::pair<NetworkId, int> > const message(
+		ServerObjectContainerCapacityNamespace::cs_containerCapacityMessage, std::make_pair(getNetworkId(), capacity));
+	std::set<Client *> const & observers = getObservers();
+	for (std::set<Client *>::const_iterator i = observers.begin(); i != observers.end(); ++i)
+	{
+		if (*i)
+			(*i)->send(message, true);
+	}
+
+	return true;
 }
 
 //-----------------------------------------------------------------------

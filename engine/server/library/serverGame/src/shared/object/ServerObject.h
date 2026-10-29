@@ -503,6 +503,11 @@ public:
 	void                          addServerToProxyList           (uint32 proxyServerProcessId);
 	void                          removeServerFromProxyList      (uint32 proxyServerProcessId);
 
+	// crafted container capacity override (objvar container.capacity, re-applied in endBaselines,
+	// sent to clients as SetContainerCapacityMessage); P25
+	bool                          setContainerCapacityOverride(int capacity);
+	void                          applyContainerCapacityOverride();
+
 	// objvar functions
 	DynamicVariableList const &   getObjVars                     () const;
 	void                          removeObjVarItem(std::string const &name);
